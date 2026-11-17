@@ -3,6 +3,28 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-17 — SAP-ready contract (api.md rev 6, spec rev 6, `docs/sap_mapping.md`)
+Goal: the SAP S/4HANA cutover changes only the server's backend connector — not the API or the tablet.
+1. **RMA identity:** the tablet treats an RMA as an opaque `rma_id` (URLs) + `display_number` (shown). The
+   1–8 digit rule is removed from the app; the server validates. Search sends whatever was typed.
+2. **Parts rows:** `orig_line_no` / `line_no` are gone from the contract. Each row has an opaque server-assigned
+   `row_id` (Macola: line number + record signature; SAP later: notification item number). New rows send
+   `row_id: null`; a save returns new `row_id`s.
+3. **Codes:** every code is a code object `{group, code}` (+ `description` in reads); `group` is `null` for
+   Macola. The tablet stores and sends codes back exactly as given. Statuses are code objects too.
+4. **Cause:** optional `cause_code` on every parts row — `null` and unused in v1; `/codelists` `causes` is empty.
+   The cause picker appears automatically when the server sends causes.
+5. **Backend-neutral names:** `MACOLA_UNAVAILABLE` → `BACKEND_UNAVAILABLE`, `macola_reachable` →
+   `backend_reachable`, `macola_open` → `is_open`, `has_inspection_record` → `inspectable`. Same idea applied to
+   the photo store: `fileshare_reachable` → `photo_store_reachable`, `FILESHARE_UNAVAILABLE` →
+   `PHOTO_STORE_UNAVAILABLE`; header `failure_cd` → `failure_code`.
+6. **Summaries:** an ordered list of text blocks with per-block labels and limits from `/codelists`
+   `summary_blocks` (Macola: 3 × 4000). Writes send only changed blocks.
+7. **Identity:** the reserved sign-in path stays. SAP will need per-inspector identity for its audit trail
+   (changed-by, status history) — expect sign-in or a per-inspector SAP user mapping before SAP go-live.
+8. **`docs/sap_mapping.md`** maps every API field to its Macola source and the expected SAP object/field, with
+   unknowns marked for the SAP team.
+
 ## 2026-11-17 — Issue #2 (settings, inspector, logo)
 - Official BITZER logo supplied by Jacob → `app/src/main/res/drawable-nodpi/bitzer_logo.png`. Only change: the
   near-black background made transparent; the mark is unaltered. Shown in the black top bar (style guide:

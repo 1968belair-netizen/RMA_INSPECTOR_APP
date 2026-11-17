@@ -76,7 +76,11 @@ class ApiClient(
     }
 
     companion object {
+        /** Reading: tolerant of new/missing fields. */
         val defaultJson = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
+
+        /** Writing: every field always present, nulls written as null — e.g. {"group": null, "code": "48a"}. */
+        val writeJson = Json { encodeDefaults = true; explicitNulls = true }
 
         fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(8, TimeUnit.SECONDS)
