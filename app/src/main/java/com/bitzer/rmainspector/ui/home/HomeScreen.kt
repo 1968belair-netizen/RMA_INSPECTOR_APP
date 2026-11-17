@@ -7,21 +7,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,39 +31,56 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bitzer.rmainspector.core.RmaNumber
+import com.bitzer.rmainspector.ui.AppUiState
+import com.bitzer.rmainspector.ui.Connection
+import com.bitzer.rmainspector.ui.components.BitzerTopBar
+import com.bitzer.rmainspector.ui.components.ConnectionBanner
 import com.bitzer.rmainspector.ui.components.ScreenHeader
 import com.bitzer.rmainspector.ui.theme.BitzerColors
-import com.bitzer.rmainspector.ui.theme.RmaInspectorTheme
 
 /**
- * Home / work list (docs/spec.md §3.2). Phase 2 placeholder: search box with RMA-number validation.
- * Lookup, work list and "on this tablet" are Phase 3 issues.
+ * Home (docs/spec.md §3.2). This issue adds server status + inspector; search and work list
+ * are wired in issue #3.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onOpenSettings: () -> Unit) {
+fun HomeScreen(state: AppUiState, onOpenSettings: () -> Unit, onRetry: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     val isRma = RmaNumber.isValid(query)
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("RMA INSPECTOR") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BitzerColors.Black,
-                    titleContentColor = BitzerColors.White,
-                    actionIconContentColor = BitzerColors.White,
-                ),
+            BitzerTopBar(
+                title = "RMA Inspector",
                 actions = {
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
                 },
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            Column(Modifier.padding(horizontal = 24.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ConnectionBanner(state.connection) {
+                    when (state.connection) {
+                        is Connection.Error -> Row {
+                            TextButton(onClick = onRetry) { Text("Retry") }
+                            TextButton(onClick = onOpenSettings) { Text("Settings") }
+                        }
+                        else -> {}
+                    }
+                }
+                val inspector = state.settings?.inspector
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = BitzerColors.Grey90)
+                    Text(
+                        if (inspector != null) "  Inspector: ${inspector.displayName} (${inspector.initials})"
+                        else "  Inspector: not set — connect to the server first",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+
             ScreenHeader("Find an RMA", subtitle = "Type an RMA number or a serial number.")
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp),
@@ -78,7 +96,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
                     modifier = Modifier.weight(1f),
                 )
                 Button(
-                    onClick = { /* Phase 3: GET /rmas/search */ },
+                    onClick = { /* issue #3: GET /rmas/search */ },
                     enabled = query.isNotEmpty(),
                     modifier = Modifier.heightIn(min = 56.dp),
                 ) {
@@ -88,7 +106,7 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
             }
             if (query.isNotEmpty()) {
                 Text(
-                    if (isRma) "Looks like an RMA number (${query})." else "Will search by serial number.",
+                    if (isRma) "Looks like an RMA number ($query)." else "Will search by serial number.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = BitzerColors.Grey90,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -97,18 +115,9 @@ fun HomeScreen(onOpenSettings: () -> Unit) {
             Card(Modifier.fillMaxWidth().padding(24.dp)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("WORK LIST", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Coming in Phase 3: RMAs at Received, Rework in Progress, Inspected and Report Complete.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Text("Coming next (issue #3): RMAs filtered by inspection status.", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
     }
-}
-
-@Preview(widthDp = 1280, heightDp = 800)
-@Composable
-private fun HomePreview() {
-    RmaInspectorTheme { HomeScreen(onOpenSettings = {}) }
 }

@@ -55,5 +55,6 @@ Commit messages: short imperative summary line.
 
 ## Style
 - UI follows the BITZER Style Guide: BITZER Green `#3AAA35` primary, Dark green `#005B23`, greys; headlines in
-  capitals; Source Sans / sans-serif. Don't draw or bundle the BITZER logo (use the official asset if supplied).
+  capitals; Source Sans / sans-serif. Logo: use only the official asset `res/drawable-nodpi/bitzer_logo.png`, on black or
+  white backgrounds, scaled proportionally; never redraw or alter it.
 - Large touch targets (shop floor, gloves): min 56 dp for primary actions.

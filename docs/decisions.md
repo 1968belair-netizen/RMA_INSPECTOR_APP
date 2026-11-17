@@ -3,6 +3,16 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-17 — Issue #2 (settings, inspector, logo)
+- Official BITZER logo supplied by Jacob → `app/src/main/res/drawable-nodpi/bitzer_logo.png`. Only change: the
+  near-black background made transparent; the mark is unaltered. Shown in the black top bar (style guide:
+  black or white backgrounds only, proportional scaling).
+- The app runs on phones (Android 8.0+) for previewing progress; the tablet stays the target layout.
+- Server address is editable in Settings and saved on the device; typed addresses without `http(s)://` get
+  `http://` (dev / mock server on the local network). The real server address will be https.
+- Inspector: chosen from `GET /inspectors`; one entry → auto-selected; several → "Who's inspecting?".
+- Phase 3 backlog = GitHub issues #2–#11.
+
 ## 2026-11-17 — Phase 2 scaffolding
 - Android: Kotlin + Jetpack Compose, minSdk 26, target/compile SDK 35, package `com.bitzer.rmainspector`.
 - Builds run only in GitHub Actions (cloud sessions can't download the Android SDK). APKs are published on a
