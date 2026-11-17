@@ -1,6 +1,6 @@
 # Mock RMA app server
 
-Implements `docs/api.md` with **fake data only**, so the tablet app can be built and tested without
+Implements `docs/api.md` (rev 6, SAP-ready) with **fake data only**, so the tablet app can be built and tested without
 BITZER's network. The real server (Phase 4) replaces it and reuses `mock_server/naming.py`.
 
 ## Run it
@@ -34,10 +34,16 @@ Serial numbers are `25X0000001` … `25X0000008`. Inspector: `jdoe` (send `X-Ins
 
 ## Test hooks (mock only)
 - `POST /api/v1/_mock/reset`
-- `POST /api/v1/_mock/rmas/{rma}/desk-edit` — body `{"header": {...}, "summary": {...}, "parts": [...], "report_pics": [...]}`
-  simulates an edit at the workbench → the next tablet save gets `409`.
+- `POST /api/v1/_mock/rmas/{rma}/desk-edit` — simulates an edit made elsewhere (workbench, later SAP) → the next
+  tablet save gets `409 RMA_CHANGED`. Body (any subset):
+  `{"header": {"credit_status": "P - Partial Warranty Credit"}, "summary": {"blocks": {"2": "typed at the desk"}},
+  "parts": [{"part_code": {"group": null, "code": "44"}, "issue_code": {"group": null, "code": "46"}, "cause_code": null, "note": ""}],
+  "report_pics": ["01-1 Example.jpg"]}`
 - `POST /api/v1/_mock/rmas/{rma}/lock` — body `{"locked": true, "held_by": "JDOE2", "possibly_stale": false}`
 - `POST /api/v1/_mock/rmas/{rma}/report-in-use` — body `{"in_use": true}`
+
+Behaves like the Macola-era server: code `group` is `null`, `row_id` = `L<n>.<signature>`, no causes,
+three 4000-character summary blocks.
 
 Mock differences from the real server: thumbnails are the original bytes; the report PDF is a placeholder;
 spell check only knows a few sample misspellings.

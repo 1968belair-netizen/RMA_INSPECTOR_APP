@@ -22,7 +22,7 @@ class ApiClientTest {
     fun parsesHealthAndIgnoresUnknownFields() = runBlocking {
         server.enqueue(MockResponse().setBody(
             """{"status":"ok","api_version":"1.0","server_version":"0.1.0","min_app_version":"0.1.0","backend":"mock",
-               "macola_reachable":true,"fileshare_reachable":true,"server_time":"2026-11-17T10:40:00-05:00","new_field":1}"""))
+               "backend_reachable":true,"photo_store_reachable":true,"server_time":"2026-11-17T10:40:00-05:00","new_field":1}"""))
         val r = api.health(base)
         assertTrue(r is ApiResult.Ok)
         assertEquals("mock", (r as ApiResult.Ok).value.backend)

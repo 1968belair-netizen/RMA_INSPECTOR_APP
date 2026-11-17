@@ -4,7 +4,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-// Shapes from docs/api.md. Unknown fields are ignored so the server can add fields safely.
+// Shapes from docs/api.md (rev 6, SAP-ready). Unknown fields are ignored so the server can add fields safely.
+// The tablet has no backend-specific rules: ids are opaque, codes are echoed exactly as received.
 
 @Serializable
 data class Health(
@@ -13,8 +14,8 @@ data class Health(
     @SerialName("server_version") val serverVersion: String = "",
     @SerialName("min_app_version") val minAppVersion: String = "0",
     val backend: String = "",
-    @SerialName("macola_reachable") val macolaReachable: Boolean = false,
-    @SerialName("fileshare_reachable") val fileshareReachable: Boolean = false,
+    @SerialName("backend_reachable") val backendReachable: Boolean = false,
+    @SerialName("photo_store_reachable") val photoStoreReachable: Boolean = false,
     @SerialName("server_time") val serverTime: String = "",
 )
 

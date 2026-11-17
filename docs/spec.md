@@ -1,6 +1,7 @@
 # RMA Inspection App — Functional Spec (v1 DRAFT)
 
-_Draft 2026-11-17 (rev 5 — round-5 answers: close/reopen RMA-team only, no device key, full change review,
+_Draft 2026-11-17 (rev 6 — SAP-ready contract: opaque RMA/row ids, code objects with optional group, optional
+cause code, summaries as blocks; see `docs/api.md` §1 and `docs/sap_mapping.md`. Rev 5 — round-5 answers: close/reopen RMA-team only, no device key, full change review,
 30-day photo retention. Rev 4 — the app now covers the inspection **and** the report: report-photo selection and
 report building. Earlier: no sign-in for now, any status, folder creation, summaries on tablet, failure
 context read-only, numeric RMAs, no barcode in v1). Follows `RMA_Inspection_App_Dev_Plan.md` (v2.2) and `Inspection_Checklists_DRAFT.md` (v1 decisions).
@@ -31,7 +32,7 @@ gives room for research while writing summaries. Either side can finish an inspe
 | Report photos: pick any number from `All Pics`, caption, remove → `Report Pics ` | |
 | Build report (`<RMA> Report.pdf` + `.xlsx`), preview PDF, spell check | |
 | Inspection status: **any** status, like the Windows workbench | Close / reopen (Macola closure) — RMA team function, not in the app |
-| General Defect Code, summaries 1–3, `inspected_by`, `summary_by` (`oermahdr_extended_ipro`) | |
+| General Defect Code, one report summary (Macola: `summary_1`, ≤ 4000), `inspected_by`, `summary_by` (Macola: `oermahdr_extended_ipro`) | |
 | Offline work + upload queue, conflict/lock messages | |
 
 **Product types:** all non-scroll types are active. **Scroll** RMAs open read-only with a banner
@@ -101,8 +102,10 @@ flowchart TD
   "Update required" with the release link.
 
 ### 3.2 Home / Work list
-- **Search box**: RMA number (digits only, `^[0-9]{1,8}$`, numeric keypad) or serial number. Typed by hand in
+- **Search box**: free text — RMA number, serial, or (after SAP) whatever identifies an RMA there. The tablet
+  only trims it; **the server decides what it matches** (no number format rule on the tablet). Typed by hand in
   v1; barcode/QR scanning is a possible later feature.
+- RMAs are shown by their `display_number`; the tablet uses the opaque `rma_id` only to call the server.
 - **Work list**: RMAs to tap instead of typing. **Status filter chips for every inspection status** — the
   inspector can show any of them. Default selection (server setting): **Received**, **Rework in Progress**,
   **Inspected**, **Report Complete** (Report Complete for rebuilds). The tablet remembers the last selection.
@@ -128,17 +131,23 @@ flowchart TD
 
 ### 3.5 Parts list (the inspection)
 - Rows in the inspector's order: `NN  part code  part description  ·  issue code  issue description  ·  📷 n  ·  📝`.
-  Existing Macola rows load first, in `line_no` order.
+  `NN` is the row's position on screen. Existing rows load first in the order the server sends them; each keeps
+  its opaque `row_id` (the tablet never shows or computes line numbers).
+- **Cause** (optional per row): the cause picker appears only when `/codelists` sends causes. Macola has none,
+  so v1 shows no cause field and sends `cause_code: null`.
 - Actions: **Add part**, tap row to edit, drag handle to reorder, swipe/delete to remove (with undo).
   Applies to every row, including rows entered at the desk (full control).
 - Header strip shows defect code and summary state ("Summary: 2 of 3 filled") with a button to the Summary screen.
-- The same part code may appear more than once (allowed by Macola; e.g. two cylinders).
+- The same part code may appear more than once (e.g. two cylinders).
 - No required items, no prompts, no order enforced (v1 decisions).
 - Draft is saved locally on every change (survives app kill / battery swap).
 
 ### 3.6 Part picker / Issue picker
 - Full-screen searchable list over **all** codes from the cached code lists; search matches code or description.
-- **Natural sort** on code (`48` < `48a` < `100`). Codes are text — never parsed as numbers.
+- Codes are **code objects** (`group` + `code`, `group` null for Macola). **Natural sort** on group, then code
+  (`48` < `48a` < `100`). Codes are text — never parsed as numbers. When a group is present the picker shows it
+  as a section heading.
+- The tablet **stores and sends back codes exactly as received** — never retyped, trimmed, padded or recased.
 - Issue picker shows **`50` Normal first**, then the rest in natural order.
 - "Recently used" strip at the top (local to the tablet) to speed up repeat entries.
 - Codes in the server's hidden list (empty in v1) are not offered, but still display if already on an RMA.
@@ -153,20 +162,21 @@ flowchart TD
   **Overview**, **Packaging/Freight**, **Other** (free text, max 40 chars). None are required in v1.
 
 ### 3.9 Defect code & summaries
-Writes `oermahdr_extended_ipro` (one summary row per RMA; the server inserts it if the RMA has none).
+Writes the RMA's summary record (Macola: `oermahdr_extended_ipro`, one row per RMA; the server creates it if missing).
 - **Failure context** at the top, read-only: Failure Code, Failure Description, Comments (collapsible).
-- **General Defect Code**: searchable picker over all `oermactl_ipro_failures` codes (natural sort; e.g.
+- **General Defect Code**: searchable picker over `defect_codes` from `/codelists` (natural sort; e.g.
   `10` Lack of lubrication). Can be cleared.
-- **Summary 1, 2, 3**: large multi-line text boxes, max 4000 characters each, with counters. Typed or
-  dictated (Android keyboard voice input).
-- **Insert standard wording** button (summary 1, only when empty) inserts the standard template for the inspector
+- **Summary text blocks**: one large multi-line box per entry in `summary_blocks` from `/codelists`, labelled
+  and limited as the server says. **v1: one "Report summary" box, ≤ 4000 characters** (Macola `summary_1`), with a counter. Typed or
+  dictated (Android keyboard voice input). The tablet has no fixed number of summaries.
+- **Insert standard wording** button (first block, only when empty) inserts the standard template for the inspector
   to fill in: _"The primary failure mode is the [ ] of the [ ] likely due to [ ]. Failure progression resulted
   in [ ]. Common causes for [ ] include [ ]. No defects in materials or workmanship were found with this
   compressor."_ The template text is served by the server, so it can change without an app update.
 - **Inspected by** and **Summary by**: separate fields, each pre-filled with the inspector's initials only if
   empty, edited independently (max 255).
 - Nothing here is required in v1; the workbench can finish or edit any of it.
-- No audit rows are written for these fields (matches Macola).
+- No audit rows are written for these fields (Macola behaviour; SAP behaviour per `docs/sap_mapping.md`).
 
 ### 3.10 Review & status
 - Summary: rows added / changed / removed vs. Macola, defect code / summary / initials changes, photo count,
@@ -179,13 +189,13 @@ Writes `oermahdr_extended_ipro` (one summary row per RMA; the server inserts it 
 ### 3.11 Submit results
 | Result | Tablet shows | What happens to the draft |
 |---|---|---|
-| Saved (`200`) | "Saved to Macola ✓" + photo upload progress | Draft cleared once photos finish; new signature stored |
+| Saved (`200`) | "Saved ✓" + photo upload progress | Draft cleared once photos finish; new signature stored |
 | Offline / server unreachable | "Queued — will send when online" | Kept in queue, auto-retry with back-off |
 | **RMA changed** (`409 RMA_CHANGED`) | Conflict screen (§3.12) | Kept; nothing written |
 | **Locked in Macola** (`423 RMA_LOCKED`) | "Open in Macola by <name> since… — will retry" (or "Possible stale lock — ask IT") | Kept; auto-retry every few minutes; inspector can cancel |
 | Lock check failed (`503 LOCK_CHECK_FAILED`) | "Can't confirm Macola lock — nothing saved, will retry" | Kept; auto-retry |
 | Validation (`422`) | Field-level errors (unknown code, too long, bad transition) | Kept; inspector fixes |
-| RMA closed / no iPro record (`409 RMA_NOT_OPEN`) | "RMA is closed in Macola — ask the office" | Kept read-only; can export/discard |
+| RMA closed / not inspectable (`409 RMA_NOT_OPEN`) | "RMA is closed — ask the RMA team" | Kept read-only; can export/discard |
 | Product type not enabled (`403`) | Read-only banner | Kept read-only |
 
 The tablet **never** silently overwrites and never retries a `409 RMA_CHANGED` on its own.
@@ -332,16 +342,17 @@ Uncoded photo:  00-<n> <Tag>.jpg
 
 ## 6. Submit sequence
 
-1. **Findings**: `POST /rmas/{rma}/inspection` with the full desired parts grid, optional status change,
-   optional summary block (defect code, summaries 1–3, `inspected_by`, `summary_by` — only changed fields),
-   `base_signature` and `submission_id`. Server runs the `apply_flex` path: validate → Macola lock check
+1. **Findings**: `POST /rmas/{rma_id}/inspection` with the full desired parts list (existing rows by `row_id`,
+   new rows with `row_id: null`), optional status change, optional summary (defect code, changed summary blocks,
+   `inspected_by`, `summary_by` — only changed parts), `base_signature` and `submission_id`. The response
+   returns new `row_id`s, which replace the old ones on the tablet. Macola server runs the `apply_flex` path: validate → Macola lock check
    (fail closed) → re-read with UPDLOCK + signature compare → JSONL backup → status → summary row
    (UPDATE by `rec_id`, or INSERT with the raw padded `cus_no`) → parts → renumber `line_no` → commit → verify.
    A status change also writes one `OERMAAUD_iPro` row with the inspector's identity. Parts, defect code and
    summary edits write no audit row (matches Macola).
    The summary-row INSERT path is untested against production — include it in the Phase 4 read-only dry run
    and the first supervised writes.
-2. **Photos**: `POST /rmas/{rma}/photos`, one per photo, after step 1 succeeds (so `SS` matches the saved row
+2. **Photos**: `POST /rmas/{rma_id}/photos`, one per photo, after step 1 succeeds (so `SS` matches the saved row
    order). If step 1 is blocked, the inspector may choose **Send photos only** (names use the tablet's order).
 3. The tablet shows final filenames returned by the server.
 
@@ -349,7 +360,7 @@ Uncoded photo:  00-<n> <Tag>.jpg
 
 ## 7. Product type handling (scroll-ready)
 
-- Every RMA response carries `product_type` (raw Macola value) and `product_type_key`
+- Every RMA response carries `product_type` (raw backend value) and `product_type_key`
   (`recip`, `screw`, `scroll`, `part`, `transport`, `pressure_vessel`, `system_unit`, `unknown`).
 - If `Product_Type` is blank, the server derives the key from the model prefix where it can
   (e.g. GSD/GTD/GUD/ELH/ELV/ELA/ESH → scroll; CS/HS/OS/CHS → screw) and sets `product_type_source: "model"`.
@@ -364,13 +375,17 @@ Uncoded photo:  00-<n> <Tag>.jpg
 
 ## 8. Data rules the app must follow
 
-- Codes are **text**; preserve exact strings (`48a`, `104bb`, `15A`, `99 – JSIOC`). Natural sort for display.
-- Limits: `part_no` / `issue_cd` 15, note 4000, `defect_cd` 10, each summary 4000, `inspected_by` /
-  `summary_by` 255. The tablet checks; the server re-checks.
-- RMA numbers are sent unpadded; the server pads (`rjust(8)`) for writes.
-- Notes with line breaks are sent with `\n`; the server stores `\r\n`.
-- The tablet never talks to Macola or G: directly and never sees server names, SQL or file paths beyond the
-  relative photo folder.
+- **Backend-neutral:** the tablet has no Macola- or SAP-specific rules. Everything backend-specific (padding,
+  line numbers, lock tables, catalogs, audit users) lives in the server's backend connector.
+- **RMA identity:** opaque `rma_id` + `display_number`; the tablet never parses, pads or validates them.
+- **Rows:** opaque `row_id`, echoed back unchanged; new rows have `row_id: null`.
+- **Codes:** code objects (`group`, `code`); preserve exact strings (`48a`, `104bb`, `15A`, `99 – JSIOC`) and
+  send them back exactly as received. Natural sort for display. Only codes from `/codelists` can be picked.
+- **Limits** come from the server (`/codelists` `limits`, per-block `max_length`). The tablet checks; the server
+  re-checks.
+- Notes with line breaks are sent with `\n`; the server converts for the backend.
+- The tablet never talks to the ERP backend or the photo store directly and never sees server names, SQL or file
+  paths beyond the relative photo folder.
 
 ---
 
@@ -388,7 +403,7 @@ Uncoded photo:  00-<n> <Tag>.jpg
 8. **`summary_by` is independent of `inspected_by`** (not copied).
 9. **Failure Code, Failure Description, Comments:** shown read-only on the tablet as failure context; edited
    at the desk.
-10. **RMA numbers are digits only.**
+10. ~~RMA numbers are digits only~~ — superseded by #23: the tablet treats RMAs as opaque; the server validates.
 11. **No barcode/QR in v1** — manual RMA entry. Maybe later.
 12. **Image size:** start at 2048 px / q85 as a server setting; confirm in the pilot.
 13. **The app covers the inspection and the report.** Report-photo selection (copy from `All Pics` into
@@ -406,6 +421,11 @@ Uncoded photo:  00-<n> <Tag>.jpg
 21. **Changes made elsewhere during an inspection are always reviewed, never overwritten** — change check
     covers the whole RMA record and `Report Pics `; no auto-merge.
 22. **Sent photos stay on the tablet 30 days**; evaluate storage later.
+23. **SAP-ready contract (2026-11-17):** opaque `rma_id` + `display_number` (no number rule on the tablet);
+    opaque server-assigned `row_id` per parts row; code objects with optional `group` (null for Macola), sent back
+    exactly as given; optional `cause_code` per row (null, unused in v1); backend-neutral names (`is_open`,
+    `inspectable`, `backend_reachable`, `BACKEND_UNAVAILABLE`); summaries as an ordered list of text blocks with
+    per-block limits from `/codelists`. Sign-in path stays reserved; SAP will need per-inspector identity.
 
 ## 10. Open questions
 

@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.bitzer.rmainspector.core.RmaNumber
 import com.bitzer.rmainspector.ui.AppUiState
 import com.bitzer.rmainspector.ui.Connection
 import com.bitzer.rmainspector.ui.components.BitzerTopBar
@@ -47,7 +46,6 @@ import com.bitzer.rmainspector.ui.theme.BitzerColors
 @Composable
 fun HomeScreen(state: AppUiState, onOpenSettings: () -> Unit, onRetry: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
-    val isRma = RmaNumber.isValid(query)
 
     Scaffold(
         topBar = {
@@ -81,7 +79,7 @@ fun HomeScreen(state: AppUiState, onOpenSettings: () -> Unit, onRetry: () -> Uni
                 }
             }
 
-            ScreenHeader("Find an RMA", subtitle = "Type an RMA number or a serial number.")
+            ScreenHeader("Find an RMA", subtitle = "Type an RMA number, a serial number, or anything else that identifies the RMA — the server works out what it is.")
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -89,7 +87,7 @@ fun HomeScreen(state: AppUiState, onOpenSettings: () -> Unit, onRetry: () -> Uni
             ) {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it.trim() },
+                    onValueChange = { query = it },
                     label = { Text("RMA no. or serial") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -97,20 +95,12 @@ fun HomeScreen(state: AppUiState, onOpenSettings: () -> Unit, onRetry: () -> Uni
                 )
                 Button(
                     onClick = { /* issue #3: GET /rmas/search */ },
-                    enabled = query.isNotEmpty(),
+                    enabled = query.isNotBlank(),
                     modifier = Modifier.heightIn(min = 56.dp),
                 ) {
                     Icon(Icons.Filled.Search, contentDescription = null)
                     Text("  Search")
                 }
-            }
-            if (query.isNotEmpty()) {
-                Text(
-                    if (isRma) "Looks like an RMA number ($query)." else "Will search by serial number.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BitzerColors.Grey90,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
             }
             Card(Modifier.fillMaxWidth().padding(24.dp)) {
                 Column(Modifier.padding(16.dp)) {

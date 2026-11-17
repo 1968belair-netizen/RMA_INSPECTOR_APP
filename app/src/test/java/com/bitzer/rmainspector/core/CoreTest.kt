@@ -2,8 +2,6 @@ package com.bitzer.rmainspector.core
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -13,15 +11,6 @@ class CoreTest {
         val f = listOf(File("../testdata/photo_naming_cases.json"), File("testdata/photo_naming_cases.json"))
             .first { it.exists() }
         JSONObject(f.readText())
-    }
-
-    @Test
-    fun rmaNumbersAreDigitsOnly() {
-        assertTrue(RmaNumber.isValid("912345"))
-        assertTrue(RmaNumber.isValid("1"))
-        assertFalse(RmaNumber.isValid("123456789"))
-        assertFalse(RmaNumber.isValid("A12345"))
-        assertFalse(RmaNumber.isValid(""))
     }
 
     @Test
