@@ -802,7 +802,7 @@ def mock_reset():
 @api.post("/_mock/rmas/{rma_id}/desk-edit")
 async def mock_desk_edit(rma_id: str, request: Request):
     """Simulate an edit made elsewhere (workbench / SAP GUI).
-    Body (any subset): {"header": {...}, "summary": {"blocks": {"2": "text"}, "defect_code": {...}},
+    Body (any subset): {"header": {...}, "summary": {"blocks": {"1": "text"}, "defect_code": {...}},
                         "parts": [ {part_code, issue_code, cause_code, note} ], "report_pics": [names]}"""
     body = await request.json()
     with store.lock:

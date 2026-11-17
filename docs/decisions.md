@@ -3,6 +3,11 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-17 — One report summary
+- The app has **one** summary field, "Report summary" (≤ 4000). It is a server setting (`summary_blocks` in
+  `/codelists`), not app code. Macola: stored in `oermahdr_extended_ipro.summary_1`; `summary_2` / `summary_3`
+  are not shown or written by the app (the desk can still use them; they stay in the change check).
+
 ## 2026-11-17 — SAP-ready contract (api.md rev 6, spec rev 6, `docs/sap_mapping.md`)
 Goal: the SAP S/4HANA cutover changes only the server's backend connector — not the API or the tablet.
 1. **RMA identity:** the tablet treats an RMA as an opaque `rma_id` (URLs) + `display_number` (shown). The

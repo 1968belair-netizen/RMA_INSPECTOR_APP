@@ -55,10 +55,10 @@ INSPECTION_STATUSES = [
 
 CAUSES: list = []   # Macola has no cause per row; SAP will send a cause catalog
 
+# One report summary (decision 2026-11-17). Macola connector: block "1" <-> oermahdr_extended_ipro.summary_1;
+# summary_2/3 are not used by the app (left untouched, still covered by the change check).
 SUMMARY_BLOCKS = [
-    {"block_id": "1", "label": "Summary 1", "max_length": 4000},
-    {"block_id": "2", "label": "Summary 2", "max_length": 4000},
-    {"block_id": "3", "label": "Summary 3", "max_length": 4000},
+    {"block_id": "1", "label": "Report summary", "max_length": 4000},
 ]
 
 PRODUCT_TYPES = [
@@ -92,7 +92,7 @@ def row(part, issue, note="", cause=None):
 
 
 def _empty_summary():
-    return {"exists": False, "defect_code": None, "blocks": {"1": "", "2": "", "3": ""},
+    return {"exists": False, "defect_code": None, "blocks": {"1": ""},
             "inspected_by": "", "summary_by": ""}
 
 
@@ -142,7 +142,7 @@ def initial_rmas() -> dict:
              credit="F - Full Warranty Credit", failure_code="2-Motor Grounded",
              parts=[row("44", "46", "Example note"), row("48", "38")],
              summary={"exists": True, "defect_code": code("07"),
-                      "blocks": {"1": "Example summary text.", "2": "", "3": ""},
+                      "blocks": {"1": "Example summary text."},
                       "inspected_by": "JD", "summary_by": "JD"}),
         _rma("912348", model="GSD60235VAB", serial="25X0000004", product_type="Scroll", status="Received"),
         _rma("912349", model="4FE-28Y", serial="25X0000005", product_type="Recip", status="Closed", is_open=False),

@@ -70,7 +70,7 @@ S/4HANA OData entity/property names the server would actually call must be confi
 | `parts[].cause_code` `{group, code}` | — (none; always `null`) | Cause catalog: QMUR-URGRP + QMUR-URCOD under the item | Proposed — unused in v1 |
 | `parts[].note` (≤ 4000) | `oermactl_ipro_detail.note` | Item text (QMFE-FETXT, short) + item long text | Proposed — short-text length limit needs a rule |
 | `summary.defect_code` `{group, code}` | `oermahdr_extended_ipro.defect_cd` → `oermactl_ipro_failures` | Header coding, or a cause on the notification, or custom field | **Unknown** |
-| `summary.blocks[]` | `summary_1..3` (3 × varchar 4000) | Notification long text(s) — one text with sections, or several text IDs. `summary_blocks` in `/codelists` lets SAP send a different block layout | **Unknown** |
+| `summary.blocks[]` (v1: one "Report summary") | `summary_1` (varchar 4000); `summary_2/3` unused by the app | Notification long text(s) — one text with sections, or several text IDs. `summary_blocks` in `/codelists` lets SAP send a different block layout | **Unknown** |
 | `summary.inspected_by` | `oermahdr_extended_ipro.inspected_by` (initials) | Partner function on the notification (e.g. person responsible) or custom field | **Unknown** |
 | `summary.summary_by` | `oermahdr_extended_ipro.summary_by` | Partner function or custom field | **Unknown** |
 | `summary.exists` | `oermahdr_extended_ipro` row present | Always true once the notification exists | Known |
@@ -85,7 +85,7 @@ S/4HANA OData entity/property names the server would actually call must be confi
 | `causes` | — (empty) | Cause catalog | Proposed |
 | `defect_codes` | `oermactl_ipro_failures` (26) | Coding catalog or cause catalog | **Unknown** |
 | `inspection_statuses` | `oermactl_ipro` `Rma_Inspection_Status` rows | User statuses of the status profile | Proposed |
-| `summary_blocks` | Fixed 3 × 4000 | Long-text layout chosen by the SAP team | **Unknown** |
+| `summary_blocks` | One block, 4000 (server config) | Long-text layout chosen by the SAP team | **Unknown** |
 | code `description` | `*_description` columns | Code / code group short texts (QPCT) | Known (standard) |
 | `hidden` | Server config (empty) | Inactive codes / codes outside the catalog profile | Proposed |
 

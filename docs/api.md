@@ -1,7 +1,7 @@
 # RMA Inspection App — Tablet ↔ Server API (v1 DRAFT)
 
 _Rev 6 — 2026-11-17: **SAP-ready contract.** Opaque RMA and row identities, code objects with an optional
-`group`, optional `cause_code`, backend-neutral names, summaries as ordered text blocks. Rev 5: no device key
+`group`, optional `cause_code`, backend-neutral names, summaries as ordered text blocks (v1: one "Report summary" block). Rev 5: no device key
 in v1, full-record change check, any-status work list. Rev 4: report-photo selection, report building, spell
 check. Companion to `docs/spec.md`; field-by-field backend mapping in `docs/sap_mapping.md`._
 
@@ -178,9 +178,7 @@ Response `200` (lists shortened):
   ],
   "status_rule": "any",
   "summary_blocks": [
-    { "block_id": "1", "label": "Summary 1", "max_length": 4000 },
-    { "block_id": "2", "label": "Summary 2", "max_length": 4000 },
-    { "block_id": "3", "label": "Summary 3", "max_length": 4000 }
+    { "block_id": "1", "label": "Report summary", "max_length": 4000 }
   ],
   "product_types": [
     { "value": "Recip",  "key": "recip",   "capabilities": { "findings": true,  "summary": true,  "photos": true,  "status": true,  "report": true  } },
@@ -208,7 +206,8 @@ Notes:
 - **`causes` is empty in v1** (Macola has no cause per row). The tablet hides the cause picker while the list
   is empty and shows it automatically when the server sends causes.
 - **`summary_blocks`** defines how many summary text blocks exist, their labels and per-block limits
-  (Macola: 3 × 4000). SAP may send different blocks (e.g. one long text) — the tablet just renders the list.
+  (v1: **one** "Report summary" block, ≤ 4000; Macola stores it in `summary_1`). The tablet renders whatever
+  list it gets, so more blocks — or SAP's long-text layout — need no app change.
 - `status_rule: "any"` = any status in `inspection_statuses` may be set (matches the workbench). The field
   exists so the server can later send a transition table without an app update.
 - `hidden` lists code objects not offered in pickers (empty in v1); hidden codes still display on existing rows.
@@ -317,9 +316,7 @@ Response `200`:
     "exists": true,
     "defect_code": { "group": null, "code": "10", "description": "Lack of lubrication" },
     "blocks": [
-      { "block_id": "1", "text": "The primary failure mode is ..." },
-      { "block_id": "2", "text": "" },
-      { "block_id": "3", "text": "" }
+      { "block_id": "1", "text": "The primary failure mode is ..." }
     ],
     "inspected_by": "JD",
     "summary_by": "JD"
@@ -479,7 +476,7 @@ Stale lock: same `RMA_LOCKED` with `"possibly_stale": true`. The server never cl
       "fields": [
         { "path": "parts[2].issue_code", "code": "UNKNOWN_CODE", "message": "Issue code '34b' is not in the issue list." },
         { "path": "parts[0].row_id", "code": "UNKNOWN_ROW", "message": "That row isn't in the loaded RMA." },
-        { "path": "summary.blocks.2", "code": "TOO_LONG", "limit": 4000, "message": "Summary 2 is 4,212 characters; the limit is 4,000." }
+        { "path": "summary.blocks.1", "code": "TOO_LONG", "limit": 4000, "message": "Report summary is 4,212 characters; the limit is 4,000." }
       ]
     }
   }

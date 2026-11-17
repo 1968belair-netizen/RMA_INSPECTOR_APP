@@ -32,7 +32,8 @@ def test_codelists_are_code_objects_with_group(client):
         for c in body[kind]:
             assert set(c) >= {"group", "code", "description"} and c["group"] is None and isinstance(c["code"], str)
     assert body["causes"] == []
-    assert [b["max_length"] for b in body["summary_blocks"]] == [4000, 4000, 4000]
+    assert [b["max_length"] for b in body["summary_blocks"]] == [4000]
+    assert body["summary_blocks"][0]["label"] == "Report summary"
     assert body["work_list_statuses"][0] == {"group": None, "code": "Received"}
     assert client.get("/api/v1/codelists", headers={"If-None-Match": r.headers["ETag"]}).status_code == 304
 
@@ -68,7 +69,7 @@ def test_detail_shape(client):
     assert set(row) == {"row_id", "part_code", "issue_code", "cause_code", "note"}
     assert row["part_code"] == {"group": None, "code": "07a", "description": "Terminal box"}
     assert row["cause_code"] is None and "line_no" not in row
-    assert [b["block_id"] for b in d["summary"]["blocks"]] == ["1", "2", "3"]
+    assert [b["block_id"] for b in d["summary"]["blocks"]] == ["1"]
     assert d["summary"]["defect_code"] is None
 
 
@@ -143,7 +144,7 @@ def test_unknown_row_vs_stale_row(client, H):
     r = client.post("/api/v1/rmas/912345/inspection", headers=H, json=bad)
     assert r.json()["error"]["details"]["fields"][0]["code"] == "UNKNOWN_ROW"
     # Stale base: old row ids are not reported as unknown — the inspector gets the conflict screen instead.
-    client.post("/api/v1/_mock/rmas/912345/desk-edit", json={"summary": {"blocks": {"2": "typed at the desk"}}})
+    client.post("/api/v1/_mock/rmas/912345/desk-edit", json={"summary": {"blocks": {"1": "typed at the desk"}}})
     stale = base_body(d, parts=[{"row_id": d["parts"][0]["row_id"], "part_code": C("07a"), "issue_code": C("50"), "cause_code": None, "note": ""}])
     r = client.post("/api/v1/rmas/912345/inspection", headers=H, json=stale)
     assert r.status_code == 409 and r.json()["error"]["code"] == "RMA_CHANGED"
@@ -152,23 +153,23 @@ def test_unknown_row_vs_stale_row(client, H):
 def test_summary_block_limits_and_unknown_block(client, H):
     d = load(client, "912345")
     r = client.post("/api/v1/rmas/912345/inspection", headers=H, json=base_body(d, summary={
-        "blocks": [{"block_id": "2", "text": "x" * 4001}, {"block_id": "9", "text": "?"}], "comments": "nope"}))
+        "blocks": [{"block_id": "1", "text": "x" * 4001}, {"block_id": "9", "text": "?"}], "comments": "nope"}))
     codes = {f["path"]: f["code"] for f in r.json()["error"]["details"]["fields"]}
-    assert codes["summary.blocks.2"] == "TOO_LONG" and codes["summary.blocks.9"] == "UNKNOWN_BLOCK"
+    assert codes["summary.blocks.1"] == "TOO_LONG" and codes["summary.blocks.9"] == "UNKNOWN_BLOCK"
     assert codes["comments"] == "READ_ONLY_FIELD"
 
 
 def test_change_elsewhere_is_never_overwritten(client, H):
     d = load(client, "912347")
     client.post("/api/v1/_mock/rmas/912347/desk-edit", json={"header": {"credit_status": "P - Partial Warranty Credit"}})
-    r = client.post("/api/v1/rmas/912347/inspection", headers=H, json=base_body(d, summary={"blocks": [{"block_id": "2", "text": "tablet"}]}))
+    r = client.post("/api/v1/rmas/912347/inspection", headers=H, json=base_body(d, summary={"blocks": [{"block_id": "1", "text": "tablet"}]}))
     assert r.status_code == 409
     err = r.json()["error"]
     assert err["code"] == "RMA_CHANGED" and err["retryable"] is False
     assert "header.credit_status" in err["details"]["changed"]
     current = err["details"]["current"]
     assert current["header"]["credit_status"].startswith("P") and current["parts"][0]["row_id"]
-    assert load(client, "912347")["summary"]["blocks"][1]["text"] == ""
+    assert load(client, "912347")["summary"]["blocks"][0]["text"] == "Example summary text."
 
 
 def test_lock_lock_failure_closed_and_inspector(client, H):

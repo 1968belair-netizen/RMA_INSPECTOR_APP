@@ -32,7 +32,7 @@ gives room for research while writing summaries. Either side can finish an inspe
 | Report photos: pick any number from `All Pics`, caption, remove → `Report Pics ` | |
 | Build report (`<RMA> Report.pdf` + `.xlsx`), preview PDF, spell check | |
 | Inspection status: **any** status, like the Windows workbench | Close / reopen (Macola closure) — RMA team function, not in the app |
-| General Defect Code, summary text blocks (Macola: 3 × 4000), `inspected_by`, `summary_by` (Macola: `oermahdr_extended_ipro`) | |
+| General Defect Code, one report summary (Macola: `summary_1`, ≤ 4000), `inspected_by`, `summary_by` (Macola: `oermahdr_extended_ipro`) | |
 | Offline work + upload queue, conflict/lock messages | |
 
 **Product types:** all non-scroll types are active. **Scroll** RMAs open read-only with a banner
@@ -167,7 +167,7 @@ Writes the RMA's summary record (Macola: `oermahdr_extended_ipro`, one row per R
 - **General Defect Code**: searchable picker over `defect_codes` from `/codelists` (natural sort; e.g.
   `10` Lack of lubrication). Can be cleared.
 - **Summary text blocks**: one large multi-line box per entry in `summary_blocks` from `/codelists`, labelled
-  and limited as the server says (Macola: "Summary 1–3", 4000 characters each), with counters. Typed or
+  and limited as the server says. **v1: one "Report summary" box, ≤ 4000 characters** (Macola `summary_1`), with a counter. Typed or
   dictated (Android keyboard voice input). The tablet has no fixed number of summaries.
 - **Insert standard wording** button (first block, only when empty) inserts the standard template for the inspector
   to fill in: _"The primary failure mode is the [ ] of the [ ] likely due to [ ]. Failure progression resulted
