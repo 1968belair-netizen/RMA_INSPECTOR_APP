@@ -98,6 +98,12 @@ data class SearchResponse(
 )
 
 @Serializable
+data class WorkListResponse(
+    val results: List<RmaListItem> = emptyList(),
+    @SerialName("generated_at") val generatedAt: String = "",
+)
+
+@Serializable
 data class RmaHeader(
     @SerialName("customer_name") val customerName: String = "",
     val model: String = "",

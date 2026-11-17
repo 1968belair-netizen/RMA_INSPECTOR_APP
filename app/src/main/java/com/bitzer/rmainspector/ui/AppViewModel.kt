@@ -6,12 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.bitzer.rmainspector.BuildConfig
 import com.bitzer.rmainspector.core.AppVersion
 import com.bitzer.rmainspector.core.ServerUrl
-import com.bitzer.rmainspector.data.ApiClient
 import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.AppSettings
 import com.bitzer.rmainspector.data.Health
 import com.bitzer.rmainspector.data.Inspector
-import com.bitzer.rmainspector.data.SettingsStore
+import com.bitzer.rmainspector.data.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,8 +37,8 @@ data class AppUiState(
 
 /** App-wide state: server address, connection, inspector (spec §2, §3.1, §3.14). */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
-    private val store = SettingsStore(app, BuildConfig.DEFAULT_SERVER_URL)
-    private val api = ApiClient()
+    private val store = ServiceLocator.settings(app)
+    private val api = ServiceLocator.api
     private val connection = MutableStateFlow<Connection>(Connection.Unknown)
     private val inspectors = MutableStateFlow<List<Inspector>>(emptyList())
 

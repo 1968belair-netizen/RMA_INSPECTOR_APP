@@ -4,6 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
@@ -23,29 +25,52 @@ sealed interface ApiResult<out T> {
     enum class Kind { UNREACHABLE, SERVER_ERROR, BAD_RESPONSE }
 }
 
+/**
+ * Talks to the RMA app server (docs/api.md). URLs are built with OkHttp's HttpUrl so opaque ids such as
+ * `rma_id` are always percent-encoded — the tablet never assumes what an id looks like.
+ */
 class ApiClient(
     private val http: OkHttpClient = defaultHttpClient(),
     private val json: Json = defaultJson,
 ) {
-    suspend fun health(baseUrl: String): ApiResult<Health> = get(baseUrl, "/health", Health.serializer())
+    suspend fun health(baseUrl: String): ApiResult<Health> =
+        get(url(baseUrl, "health"), baseUrl, Health.serializer())
 
     suspend fun inspectors(baseUrl: String): ApiResult<InspectorsResponse> =
-        get(baseUrl, "/inspectors", InspectorsResponse.serializer())
+        get(url(baseUrl, "inspectors"), baseUrl, InspectorsResponse.serializer())
+
+    suspend fun codeLists(baseUrl: String): ApiResult<CodeLists> =
+        get(url(baseUrl, "codelists"), baseUrl, CodeLists.serializer())
+
+    /** Free-text search; the server decides whether it's an RMA, a serial, … (api §5). */
+    suspend fun search(baseUrl: String, query: String): ApiResult<SearchResponse> =
+        get(url(baseUrl, "rmas", "search", query = mapOf("q" to query.trim())), baseUrl, SearchResponse.serializer())
+
+    /** Work list. Empty [statuses] = server default. */
+    suspend fun workList(baseUrl: String, statuses: List<CodeKey>, limit: Int = 50): ApiResult<WorkListResponse> {
+        val q = buildMap {
+            if (statuses.isNotEmpty()) put("inspection_status", StatusQuery.format(statuses))
+            put("limit", limit.toString())
+        }
+        return get(url(baseUrl, "rmas", query = q), baseUrl, WorkListResponse.serializer())
+    }
+
+    suspend fun rmaDetail(baseUrl: String, rmaId: String): ApiResult<RmaDetail> =
+        get(url(baseUrl, "rmas", rmaId), baseUrl, RmaDetail.serializer())
 
     suspend fun <T> get(
+        url: HttpUrl?,
         baseUrl: String,
-        path: String,
         deserializer: DeserializationStrategy<T>,
         inspector: String? = null,
     ): ApiResult<T> = withContext(Dispatchers.IO) {
-        val request = try {
-            Request.Builder().url(baseUrl.trimEnd('/') + path).apply {
-                header("Accept", "application/json")
-                if (inspector != null) header("X-Inspector", inspector)
-            }.build()
-        } catch (e: IllegalArgumentException) {
+        if (url == null) {
             return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
         }
+        val request = Request.Builder().url(url).apply {
+            header("Accept", "application/json")
+            if (inspector != null) header("X-Inspector", inspector)
+        }.build()
         try {
             http.newCall(request).execute().use { resp ->
                 val body = resp.body?.string().orEmpty()
@@ -86,5 +111,20 @@ class ApiClient(
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
+
+        /** base + path segments (each percent-encoded) + query parameters. Null if the base isn't a URL. */
+        fun url(baseUrl: String, vararg segments: String, query: Map<String, String> = emptyMap()): HttpUrl? {
+            val base = baseUrl.trim().trimEnd('/').toHttpUrlOrNull() ?: return null
+            return base.newBuilder().apply {
+                segments.forEach { addPathSegment(it) }
+                query.forEach { (k, v) -> addQueryParameter(k, v) }
+            }.build()
+        }
     }
+}
+
+/** `inspection_status` query value: comma-separated codes; `group:code` when a group is present (api §5). */
+object StatusQuery {
+    fun format(statuses: List<CodeKey>): String =
+        statuses.joinToString(",") { if (it.group.isNullOrEmpty()) it.code else "${it.group}:${it.code}" }
 }
