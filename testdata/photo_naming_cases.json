@@ -1,0 +1,29 @@
+{
+  "_about": "Shared test cases for the photo naming rules in docs/spec.md §5. Used by the Android unit tests and the mock server tests. Descriptions are code-list text, not customer data.",
+  "part_photos": [
+    { "seq": 1, "n": 1, "part": "Terminal box", "issue_cd": "50", "issue": "Normal", "expect": "01-1 Terminal box - 50 Normal.jpg" },
+    { "seq": 3, "n": 1, "part": "Piston assy / skirt", "issue_cd": "34", "issue": "Scored / Scratched", "expect": "03-1 Piston assy, skirt - 34 Scored, Scratched.jpg" },
+    { "seq": 3, "n": 2, "part": "Piston assy / skirt", "issue_cd": "34", "issue": "Scored / Scratched", "expect": "03-2 Piston assy, skirt - 34 Scored, Scratched.jpg" },
+    { "seq": 2, "n": 1, "part": "Steel shaft ?", "issue_cd": "12", "issue": "Broken", "expect": "02-1 Steel shaft - 12 Broken.jpg" },
+    { "seq": 5, "n": 2, "part": "Length of Wire w/ Connector", "issue_cd": "04", "issue": "Damaged", "expect": "05-2 Length of Wire with Connector - 04 Damaged.jpg" },
+    { "seq": 7, "n": 1, "part": "Wire to Wire w/out Conn.", "issue_cd": "06", "issue": "Open / Not sealing", "expect": "07-1 Wire to Wire without Conn - 06 Open, Not sealing.jpg" },
+    { "seq": 4, "n": 1, "part": "Oil slinger/oil pick-up tube", "issue_cd": "32a", "issue": "Polished (Light wear)", "expect": "04-1 Oil slinger, oil pick-up tube - 32a Polished (Light wear).jpg" },
+    { "seq": 9, "n": 10, "part": "Radial brg, main rotor, dsch", "issue_cd": "36", "issue": "-", "expect": "09-10 Radial brg, main rotor, dsch - 36 -.jpg" },
+    { "seq": 100, "n": 1, "part": "Compressor", "issue_cd": "50", "issue": "Normal", "expect": "100-1 Compressor - 50 Normal.jpg" },
+    { "seq": 6, "n": 1, "part": "An unusually long part description that goes past forty", "issue_cd": "13", "issue": "A very long issue description over thirty", "expect": "06-1 An unusually long part description that - 13 A very long issue description.jpg" }
+  ],
+  "rma_photos": [
+    { "n": 1, "tag": "As received", "tag_text": null, "expect": "00-1 As received.jpg" },
+    { "n": 2, "tag": "Nameplate", "tag_text": null, "expect": "00-2 Nameplate.jpg" },
+    { "n": 3, "tag": "Packaging/Freight", "tag_text": null, "expect": "00-3 Packaging, Freight.jpg" },
+    { "n": 4, "tag": "Other", "tag_text": "Oil sample: dark?", "expect": "00-4 Oil sample dark.jpg" }
+  ],
+  "natural_sort": {
+    "input": ["100", "48a", "07a", "48", "104bb", "07", "9", "PV01", "104b", "TR10", "TR02", "32a", "32"],
+    "expect": ["07", "07a", "9", "32", "32a", "48", "48a", "100", "104b", "104bb", "PV01", "TR02", "TR10"]
+  },
+  "natural_sort_filenames": {
+    "input": ["03-2 A.jpg", "10-1 B.jpg", "00-1 As received.jpg", "03-10 A.jpg", "03-1 A.jpg", "IMG_1234.jpg"],
+    "expect": ["00-1 As received.jpg", "03-1 A.jpg", "03-2 A.jpg", "03-10 A.jpg", "10-1 B.jpg", "IMG_1234.jpg"]
+  }
+}

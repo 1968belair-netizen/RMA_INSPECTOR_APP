@@ -33,3 +33,46 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# ------------------------------------------------------------------
+# RMA project data safety — NEVER commit real RMA/customer data,
+# server names, IPs or credentials. (Added before the first real commit.)
+# ------------------------------------------------------------------
+backups/
+audit_output/
+*_snapshots.json
+*.jsonl
+*.csv
+*.xlsx
+*.pdf
+data/
+real_data/
+photos/
+*.jpg
+*.jpeg
+*.png
+!app/src/main/res/**/*.png
+!docs/images/*.png
+rma_tools_settings.json
+rma_tools_log.txt
+rma_tools_crash.txt
+
+# Secrets / local config
+.env
+.env.*
+*.pem
+*.p12
+secrets/
+server/config.local.*
+mock-server/config.local.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node (fonts helper etc.)
+node_modules/
