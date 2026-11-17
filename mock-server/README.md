@@ -4,6 +4,10 @@ Implements `docs/api.md` with **fake data only**, so the tablet app can be built
 BITZER's network. The real server (Phase 4) replaces it and reuses `mock_server/naming.py`.
 
 ## Run it
+**Windows, no typing:** double-click `run_mock_server.bat`. It installs the requirements, shows this PC's
+IPv4 address, and starts the server on port 8000. Allow it through Windows Firewall (Private networks) when asked.
+
+**Command line:**
 ```
 cd mock-server
 pip install -r requirements.txt

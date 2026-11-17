@@ -45,9 +45,9 @@ audit_output/
 *.csv
 *.xlsx
 *.pdf
-data/
-real_data/
-photos/
+/data/
+/real_data/
+/photos/
 *.jpg
 *.jpeg
 *.png
