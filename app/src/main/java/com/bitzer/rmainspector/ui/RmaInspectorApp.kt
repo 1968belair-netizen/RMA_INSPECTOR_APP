@@ -1,10 +1,13 @@
 package com.bitzer.rmainspector.ui
 
+import android.app.Activity
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -36,20 +39,38 @@ fun RmaInspectorApp(vm: AppViewModel = viewModel()) {
     val nav = rememberNavController()
     val start = remember { if (vm.state.value.signedIn) Routes.HOME else Routes.SIGN_IN }
 
-    // Signing in opens Home; signing out (or a 401 from the server) returns to sign-in and clears the back stack.
+    // Sign-in / sign-out navigation (spec §2, decision 2026-11-18):
+    // - Sign out (Settings) → sign-in with a cleared back stack.
+    // - Token rejected mid-session (401) → sign-in on top of the current screen; the screens below are kept.
+    // - Signed in → back to the screen the user was on if there is one, otherwise Home.
     LaunchedEffect(state.signedIn) {
         val current = nav.currentDestination?.route ?: return@LaunchedEffect
-        val target = if (state.signedIn) Routes.HOME else Routes.SIGN_IN
-        if (state.signedIn && current != Routes.SIGN_IN) return@LaunchedEffect
-        if (current == target) return@LaunchedEffect
-        nav.navigate(target) {
-            popUpTo(nav.graph.id) { inclusive = true }
-            launchSingleTop = true
+        if (state.signedIn) {
+            if (current != Routes.SIGN_IN) return@LaunchedEffect
+            val below = nav.previousBackStackEntry?.destination?.route
+            if (below != null && below != Routes.SIGN_IN && nav.popBackStack()) return@LaunchedEffect
+            nav.navigate(Routes.HOME) {
+                popUpTo(nav.graph.id) { inclusive = true }
+                launchSingleTop = true
+            }
+        } else {
+            if (current == Routes.SIGN_IN) return@LaunchedEffect
+            if (vm.state.value.sessionExpired) {
+                nav.navigate(Routes.SIGN_IN) { launchSingleTop = true }
+            } else {
+                nav.navigate(Routes.SIGN_IN) {
+                    popUpTo(nav.graph.id) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
         }
     }
 
     NavHost(navController = nav, startDestination = start) {
         composable(Routes.SIGN_IN) {
+            // Back must not get past sign-in to the screens kept below it: leave the app instead.
+            val activity = LocalContext.current as? Activity
+            BackHandler(enabled = nav.previousBackStackEntry != null) { activity?.finish() }
             SignInScreen(
                 initialUsername = vm.lastUsername,
                 progress = state.signIn,

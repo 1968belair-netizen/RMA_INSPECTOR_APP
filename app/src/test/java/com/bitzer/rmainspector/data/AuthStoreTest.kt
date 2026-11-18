@@ -4,6 +4,7 @@ import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,5 +65,30 @@ class AuthStoreTest {
     fun unreadableStoredSessionMeansSignedOut() {
         prefs.edit().putString("session_sealed", "not-decryptable").commit()
         assertNull(AuthStore(prefs, FakeBox).session.value)
+    }
+
+    @Test
+    fun expiredIsSetBy401AndClearedBySignInOrSignOut() {
+        val store = AuthStore(prefs, FakeBox)
+        store.save(demo)
+        assertFalse(store.expired.value)
+        store.expire("tok-1")
+        assertTrue(store.expired.value)
+        store.save(demo.copy(token = "tok-2"))
+        assertFalse(store.expired.value)
+        store.expire("tok-2")
+        store.clear()
+        assertFalse(store.expired.value)
+    }
+
+    @Test
+    fun passwordIsNeverStored() {
+        val store = AuthStore(prefs, FakeBox)
+        store.save(demo)
+        // Only the sealed session, last username and device id are written; the session holds token + user only.
+        assertEquals(setOf("session_sealed", "last_username"), prefs.all.keys - "device_id")
+        val sealed = prefs.getString("session_sealed", null)!!
+        val plain = String(FakeBox.decrypt(sealed))
+        assertFalse(plain.contains("password", ignoreCase = true))
     }
 }

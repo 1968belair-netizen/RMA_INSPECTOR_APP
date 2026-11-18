@@ -3,6 +3,20 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Sign-in answers (Jacob, from docs/questions.md #1–2)
+- **Token storage (approved):** the session token is encrypted with AES-256-GCM using a non-exportable Android
+  Keystore key, no extra library (`data/AuthStore.kt`). **Only the token (and the user's name/initials) is stored —
+  never the password.** The password lives only in the sign-in form's memory and in the login request.
+- **Token rejected mid-session (`401`) (approved with a change):** sign-in is shown on top of the current screen;
+  after signing in again the user returns to the **screen and RMA they were on** (fallback: Home if that isn't
+  possible). Back on the sign-in screen leaves the app rather than skipping sign-in. Explicit Sign out still clears
+  the screen history.
+- **Queued work keeps its inspector:** if a different user signs in, work already queued keeps the original
+  inspector's identity (user, initials) and is **never re-attributed**. Applies to the upload queue (#9) — each
+  queued item stores who made it at the time it was made.
+- Reflected in: spec §2, `AuthStore.expired`, `RmaInspectorApp.kt` navigation, `AuthStoreTest`, emulator
+  `SmokeTest.reSignInReturnsToTheSameRma`.
+
 ## 2026-11-18 — Build order, milestones and process (Jacob)
 - Core loop first: sign-in → code lists/pickers → home/work list → workspace shell → findings → photos → submit
   inspection → queue/conflicts → report tab → submit report → camera search → guided inspection.

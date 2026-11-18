@@ -40,6 +40,8 @@ data class AppUiState(
     /** The signed-in user; null = show the sign-in screen. Initials pre-fill Inspected by / Summary by. */
     val user: User? = null,
     val signIn: SignInProgress = SignInProgress(),
+    /** The server rejected the token mid-session: sign-in is shown over the current screen (decision 2026-11-18). */
+    val sessionExpired: Boolean = false,
 ) {
     val signedIn: Boolean get() = user != null
 }
@@ -55,13 +57,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Last username, to pre-fill the sign-in form (not secret). */
     val lastUsername: String get() = auth.lastUsername
 
-    val state: StateFlow<AppUiState> = combine(store.settings, connection, auth.session, signIn) { s, c, session, p ->
-        AppUiState(settings = s, connection = c, user = session?.user, signIn = p)
+    val state: StateFlow<AppUiState> = combine(store.settings, connection, auth.session, signIn, auth.expired) { s, c, session, p, expired ->
+        AppUiState(settings = s, connection = c, user = session?.user, signIn = p, sessionExpired = expired)
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
         // The stored session is read synchronously, so the first frame already knows whether to show sign-in.
-        AppUiState(user = auth.session.value?.user),
+        AppUiState(user = auth.session.value?.user, sessionExpired = auth.expired.value),
     )
 
     init {

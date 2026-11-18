@@ -30,8 +30,12 @@ decisions: `docs/decisions.md`._
 - **First screen:** username + password, checked by the server (`POST /auth/login` → token). Replaces the
   inspector picker.
 - v1 credentials are a **server setting** (mock: a fake demo user). No credentials in the app or the repo.
-- **Stays signed in until the user signs out** (Settings → Sign out). A `401` from the server returns to sign-in;
-  queued work is kept and sent once signed in again.
+- **Stays signed in until the user signs out** (Settings → Sign out, which clears the screen history). Only the
+  token is stored (encrypted with an Android Keystore key) — **never the password**.
+- **A `401` mid-session** shows sign-in on top of the current screen; after signing in again the user returns to
+  the **same screen and RMA** (fallback: Home). Back on that sign-in screen leaves the app.
+- **Queued work is kept** and sent once signed in again. It keeps the identity of the inspector who made it — if a
+  different user signs in, queued work is **never re-attributed** to them.
 - The signed-in user's initials pre-fill Inspected by / Summary by. Their name is shown in Settings.
 - Sign-in screen also shows server reachability and the app version, and links to Settings (server address).
 
@@ -210,6 +214,8 @@ The tablet **never** silently overwrites and never retries a `409 RMA_CHANGED` o
 
 ### 6.6 Upload queue
 - List of queued submissions and photos per RMA with state (waiting / sending / blocked: reason).
+- Each queued item stores the inspector who made it (user + initials) and is sent under that identity, even if a
+  different user is signed in later (decision 2026-11-18). The queue is not cleared by sign-out or a `401`.
 - Retry now, cancel (with confirmation), view error detail.
 
 
