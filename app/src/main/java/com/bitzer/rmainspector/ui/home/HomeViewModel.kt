@@ -91,7 +91,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             }
         } else {
             // No code lists on the device yet: use the saved choice if any, else let the server apply its defaults.
-            _state.update { it.copy(workList = it.workList.copy(filter = saved)) }
+            _state.update { it.copy(workList = it.workList.copy(filter = saved?.let(WorkListRules::migrate))) }
         }
         val want = url to _state.value.workList.filter
         if (want != requested) load()
@@ -151,7 +151,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun setFilter(change: (WorkListFilter, WorkListState) -> WorkListFilter) {
         val ws = _state.value.workList
-        val next = change(ws.filter ?: WorkListFilter(), ws)
+        val next = change(ws.filter ?: WorkListFilter(hasBlankChip = true), ws)
         _state.update { it.copy(workList = it.workList.copy(filter = next)) }
         viewModelScope.launch { store.setWorkListFilter(next) }
         load()

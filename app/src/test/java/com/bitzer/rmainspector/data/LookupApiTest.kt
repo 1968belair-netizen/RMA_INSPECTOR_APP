@@ -46,7 +46,7 @@ class LookupApiTest {
                "status_since":"2026-10-26","status_since_estimated":true,
                "flags":[{"code":"CORE_TEARDOWN","label":"In core teardown log"}],
                "is_open":true,"inspectable":true,"locked":false}],"generated_at":"2026-11-17T10:00:00-05:00"}"""))
-        val r = api.workList(base, listOf("Recip", "Screw"), listOf(CodeKey(null, "Repair & Return"), CodeKey("ZRMA", "E0003"))) as ApiResult.Ok
+        val r = api.workList(base, listOf("Recip", "Screw", "(blank)"), listOf(CodeKey(null, "Repair & Return"), CodeKey("ZRMA", "E0003"))) as ApiResult.Ok
         assertEquals("912345", r.value.results.single().rmaId)
         val item = r.value.results.single()
         assertEquals("Warranty", item.returnCode?.code)
@@ -54,7 +54,7 @@ class LookupApiTest {
         assertTrue(item.statusSinceEstimated)
         assertEquals("CORE_TEARDOWN", item.flags.single().code)
         val url = server.takeRequest().requestUrl!!
-        assertEquals("Recip,Screw", url.queryParameter("product_type"))
+        assertEquals("Recip,Screw,(blank)", url.queryParameter("product_type"))
         assertEquals("Repair & Return,ZRMA:E0003", url.queryParameter("return_code"))
         assertNull(url.queryParameter("inspection_status"))
     }

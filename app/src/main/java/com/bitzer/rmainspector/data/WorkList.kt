@@ -8,12 +8,16 @@ import java.time.temporal.ChronoUnit
 
 /**
  * The work-list chip selection (spec §3.3), remembered on the device. Product types are the `product_types`
- * values; return codes are code keys exactly as received.
+ * values plus the reserved token [WorkListRules.BLANK]; return codes are code keys exactly as received.
+ *
+ * [hasBlankChip] marks a selection made since the "(blank)" chip exists (issue #36). A remembered selection
+ * without it (saved before the chip) gets "(blank)" added once when it is resolved.
  */
 @Serializable
 data class WorkListFilter(
     @SerialName("product_types") val productTypes: List<String> = emptyList(),
     @SerialName("return_codes") val returnCodes: List<CodeKey> = emptyList(),
+    @SerialName("has_blank_chip") val hasBlankChip: Boolean = false,
 ) {
     val productTypeKeys: Set<CodeKey> get() = productTypes.map { CodeKey(null, it) }.toSet()
     val returnCodeKeys: Set<CodeKey> get() = returnCodes.toSet()
@@ -21,7 +25,10 @@ data class WorkListFilter(
 
 /** Chips offered on Home and the selection to use. */
 data class WorkListChips(
-    /** Product types as chip objects (`code` = the product type value), in server order; blank values left out. */
+    /**
+     * Product types as chip objects (`code` = the product type value), in server order, blank values left out,
+     * then the "(blank)" chip ([WorkListRules.BLANK]) last.
+     */
     val productTypes: List<Code>,
     /** Return codes in natural sort order. */
     val returnCodes: List<Code>,
@@ -29,10 +36,17 @@ data class WorkListChips(
 )
 
 object WorkListRules {
+    /**
+     * Reserved `product_type` filter token = "product type is empty" (api §5, decision 2026-11-18, issue #36).
+     * Always offered as a chip; selected by default when the server's `work_list_product_types` lists it.
+     */
+    const val BLANK = "(blank)"
+
     private fun norm(s: String?) = s.orEmpty().trim().uppercase()
 
     fun productTypeChips(lists: CodeLists): List<Code> =
-        lists.productTypes.map { it.value }.filter { it.isNotBlank() }.distinct().map { Code(null, it, it) }
+        lists.productTypes.map { it.value }.filter { it.isNotBlank() && norm(it) != norm(BLANK) }.distinct()
+            .map { Code(null, it, it) } + Code(null, BLANK, BLANK)
 
     fun returnCodeChips(lists: CodeLists): List<Code> =
         lists.returnCodes.distinctBy { it.key }.sortedWith(CodeOrder)
@@ -46,19 +60,21 @@ object WorkListRules {
             returnCodes = lists.workListReturnCodes.mapNotNull { d ->
                 rcs.firstOrNull { norm(it.code) == norm(d.code) && norm(it.group) == norm(d.group) }?.key
             }.distinct(),
+            hasBlankChip = true,
         )
     }
 
     /**
      * The saved choice where it still fits the server's lists, else the server default — per chip row.
      * A row the user cleared on purpose stays empty; a row whose saved values the server no longer offers falls
-     * back to the default.
+     * back to the default. A selection saved before the "(blank)" chip existed gets it added once.
      */
-    fun resolve(lists: CodeLists, saved: WorkListFilter?): WorkListChips {
+    fun resolve(lists: CodeLists, saved0: WorkListFilter?): WorkListChips {
         val pts = productTypeChips(lists)
         val rcs = returnCodeChips(lists)
         val def = defaults(lists)
-        if (saved == null) return WorkListChips(pts, rcs, def)
+        if (saved0 == null) return WorkListChips(pts, rcs, def)
+        val saved = migrate(saved0)
         val ptValues = pts.map { it.code }.toSet()
         val rcKeys = rcs.map { it.key }.toSet()
         val savedPt = saved.productTypes.filter { it in ptValues }
@@ -66,10 +82,21 @@ object WorkListRules {
         return WorkListChips(
             pts, rcs,
             WorkListFilter(
-                productTypes = if (saved.productTypes.isNotEmpty() && savedPt.isEmpty()) def.productTypes else savedPt,
+                productTypes = if (saved0.productTypes.isNotEmpty() && saved0.productTypes.none { it in ptValues }) def.productTypes else savedPt,
                 returnCodes = if (saved.returnCodes.isNotEmpty() && savedRc.isEmpty()) def.returnCodes else savedRc,
+                hasBlankChip = true,
             ),
         )
+    }
+
+    /**
+     * Remembered selection from before the "(blank)" chip (issue #36): add the chip once, in chip order (last).
+     * A product-type row the user had cleared on purpose stays cleared.
+     */
+    fun migrate(saved: WorkListFilter): WorkListFilter = when {
+        saved.hasBlankChip -> saved
+        saved.productTypes.isEmpty() -> saved.copy(hasBlankChip = true)
+        else -> saved.copy(productTypes = saved.productTypes.filter { it != BLANK } + BLANK, hasBlankChip = true)
     }
 
     /** Toggle one chip; keeps the chip row's order so the saved value is stable. */

@@ -462,14 +462,15 @@ def _csv_codes(value: Optional[str]) -> Optional[set]:
 @api.get("/rmas")
 def work_list(product_type: Optional[str] = None, return_code: Optional[str] = None, limit: int = 200):
     """Work list (decision 2026-11-18): open + inspectable RMAs at the configured statuses (Received),
-    filtered by product type and return code (defaults = server settings), oldest status_since first."""
+    filtered by product type and return code (defaults = server settings), oldest status_since first.
+    The product_type token "(blank)" matches an empty product type (issue #36)."""
     statuses = {norm(s) for s in fd.WORK_LIST_STATUSES}
     types = _csv_codes(product_type) if product_type is not None else {norm(t) for t in fd.WORK_LIST_PRODUCT_TYPES}
     codes = _csv_codes(return_code) if return_code is not None else {norm(c) for c in fd.WORK_LIST_RETURN_CODES}
     rows = [r for r in store.rmas.values()
             if r["is_open"] and r["inspectable"]
             and norm(r["header"]["inspection_status"]) in statuses
-            and norm(r["product_type"]) in types
+            and (norm(r["product_type"]) or norm(fd.BLANK_PRODUCT_TYPE)) in types
             and norm(r["header"]["return_code"]) in codes]
     rows.sort(key=lambda r: (r["status_since"], r["display_number"]))
     return {"results": [list_item(r) for r in rows[:limit]], "generated_at": now()}
