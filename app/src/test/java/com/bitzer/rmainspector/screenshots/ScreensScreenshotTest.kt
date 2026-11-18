@@ -18,12 +18,15 @@ import com.bitzer.rmainspector.ui.components.DropdownField
 import com.bitzer.rmainspector.ui.components.MultiSelectChipRow
 import com.bitzer.rmainspector.ui.home.HomeContent
 import com.bitzer.rmainspector.ui.home.HomeState
-import com.bitzer.rmainspector.ui.rma.OverviewState
-import com.bitzer.rmainspector.ui.rma.RmaOverviewContent
 import com.bitzer.rmainspector.ui.settings.SettingsScreen
 import com.bitzer.rmainspector.ui.signin.SignInContent
 import com.bitzer.rmainspector.ui.signin.SignInState
 import com.bitzer.rmainspector.ui.theme.RmaInspectorTheme
+import com.bitzer.rmainspector.ui.workspace.WorkspaceCallbacks
+import com.bitzer.rmainspector.ui.workspace.WorkspaceContent
+import com.bitzer.rmainspector.ui.workspace.WorkspaceLoad
+import com.bitzer.rmainspector.ui.workspace.WorkspaceState
+import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -67,10 +70,28 @@ abstract class ScreenCatalog(private val device: String) {
     @Test fun home_error() = shot("home_error") { home(ScreenshotData.homeError) }
     @Test fun home_offline() = shot("home_offline") { home(ScreenshotData.homeOffline, ScreenshotData.appOffline) }
 
-    @Test fun rma_overview() = shot("rma_overview") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rma), {}, {}) }
-    @Test fun rma_locked() = shot("rma_locked") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rmaLocked), {}, {}) }
-    @Test fun rma_scroll_read_only() = shot("rma_scroll_read_only") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rmaScroll), {}, {}) }
-    @Test fun rma_not_found() = shot("rma_not_found") { RmaOverviewContent(OverviewState.Error("RMA 999 was not found.", notFound = true), {}, {}) }
+    // --- Inspection workspace (A5): header, banners, tabs, two panes (tablet) / list → detail (phone)
+    @Composable
+    private fun workspace(state: WorkspaceState) = WorkspaceContent(state, WorkspaceCallbacks())
+
+    @Test fun workspace_findings() = shot("workspace_findings") { workspace(ScreenshotData.workspace) }
+    @Test fun workspace_findings_selected() = shot("workspace_findings_selected") {
+        workspace(ScreenshotData.workspace.copy(selection = ScreenshotData.rma.parts[1].rowId))
+    }
+    @Test fun workspace_failure_info_expanded() = shot("workspace_failure_info_expanded") {
+        workspace(ScreenshotData.workspace.copy(failureExpanded = true))
+    }
+    @Test fun workspace_photos() = shot("workspace_photos") { workspace(ScreenshotData.workspace.copy(tab = WorkspaceTab.PHOTOS)) }
+    @Test fun workspace_report() = shot("workspace_report") { workspace(ScreenshotData.workspace.copy(tab = WorkspaceTab.REPORT)) }
+    @Test fun workspace_locked() = shot("workspace_locked") { workspace(ScreenshotData.workspaceLocked) }
+    @Test fun workspace_scroll_read_only() = shot("workspace_scroll_read_only") { workspace(ScreenshotData.workspaceScroll) }
+    @Test fun workspace_closed() = shot("workspace_closed") { workspace(ScreenshotData.workspaceClosed) }
+    @Test fun workspace_changed_elsewhere() = shot("workspace_changed_elsewhere") {
+        workspace(ScreenshotData.workspace.copy(changedElsewhere = true))
+    }
+    @Test fun workspace_not_found() = shot("workspace_not_found") {
+        workspace(WorkspaceState(load = WorkspaceLoad.Error("RMA 999 was not found.", notFound = true)))
+    }
 
     // --- Shared code pickers (A3)
     @Test fun dropdown_closed() = shot("dropdown_closed") {

@@ -17,8 +17,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.bitzer.rmainspector.BuildConfig
 import com.bitzer.rmainspector.ui.home.HomeScreen
-import com.bitzer.rmainspector.ui.rma.RmaOverviewScreen
-import com.bitzer.rmainspector.ui.rma.RmaOverviewViewModel
+import com.bitzer.rmainspector.ui.workspace.WorkspaceScreen
+import com.bitzer.rmainspector.ui.workspace.WorkspaceViewModel
 import com.bitzer.rmainspector.ui.settings.SettingsScreen
 import com.bitzer.rmainspector.ui.signin.SignInScreen
 
@@ -26,7 +26,7 @@ object Routes {
     const val SIGN_IN = "signin"
     const val HOME = "home"
     const val SETTINGS = "settings"
-    const val RMA = "rma/{${RmaOverviewViewModel.ARG_RMA_ID}}"
+    const val RMA = "rma/{${WorkspaceViewModel.ARG_RMA_ID}}"
 
     /** rma_id is opaque — encode it so any characters survive the route. */
     fun rma(rmaId: String) = "rma/" + Uri.encode(rmaId)
@@ -93,9 +93,9 @@ fun RmaInspectorApp(vm: AppViewModel = viewModel()) {
         }
         composable(
             Routes.RMA,
-            arguments = listOf(navArgument(RmaOverviewViewModel.ARG_RMA_ID) { type = NavType.StringType }),
+            arguments = listOf(navArgument(WorkspaceViewModel.ARG_RMA_ID) { type = NavType.StringType }),
         ) {
-            RmaOverviewScreen(onBack = { nav.popBackStack() })
+            WorkspaceScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(

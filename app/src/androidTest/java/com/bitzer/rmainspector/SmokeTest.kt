@@ -26,6 +26,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import com.bitzer.rmainspector.ui.home.HomeTags
 import com.bitzer.rmainspector.ui.signin.SignInTags
+import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
+import com.bitzer.rmainspector.ui.workspace.WorkspaceTags
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -35,8 +37,8 @@ import org.junit.runner.RunWith
 
 /**
  * Emulator UI test, run in GitHub Actions against the mock server (reached at 10.0.2.2:8000 — the app's
- * debug default). Sign in as the mock's FAKE demo user (demo/demo) → search 912345 → RMA → back →
- * Settings → Sign out.
+ * debug default). Sign in as the mock's FAKE demo user (demo/demo) → search 912345 → workspace → each tab →
+ * back → work list 912348 (scroll, read only) and 912346 (locked) → back → Settings → Sign out.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -72,13 +74,37 @@ class SmokeTest {
 
         compose.onNode(hasSetTextAction()).performTextInput("912345")
         compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
-        compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
         compose.onNodeWithText("Example Refrigeration Co.").assertExists()
+        compose.onNodeWithText("No guided list for Recip yet").assertExists()
+
+        // Workspace (A5): failure info expands; each tab shows its panes.
+        compose.onNodeWithTag(WorkspaceTags.FAILURE_TOGGLE).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Example: low oil pressure trips reported"), timeoutMillis = 5_000)
+        for (tab in WorkspaceTab.entries) {
+            compose.onNodeWithTag(WorkspaceTags.tab(tab)).performClick()
+            compose.waitUntilAtLeastOneExists(hasTestTag(WorkspaceTags.listPane(tab)), timeoutMillis = 5_000)
+        }
         // App-level back (Espresso's pressBack waits for window focus, which the keyboard can hold on CI emulators).
-        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        back()
         compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 10_000)
 
+        // Open from the work list: scroll RMA 912348 is read only.
+        openFromHomeList("912348")
+        compose.waitUntilAtLeastOneExists(hasText("Handled in the repair database", substring = true), timeoutMillis = 15_000)
+        back()
+        // Home keeps its scroll position, so the card is on screen again (the headline may be scrolled away).
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.workItem("912348")), timeoutMillis = 10_000)
+
+        // 912346 is open elsewhere → lock banner.
+        openFromHomeList("912346")
+        compose.waitUntilAtLeastOneExists(hasText("Open elsewhere by JDOE2", substring = true), timeoutMillis = 15_000)
+        back()
+        // Home keeps its scroll position, so the card is on screen again (the headline may be scrolled away).
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.workItem("912346")), timeoutMillis = 10_000)
+
         // Settings → Sign out returns to sign-in.
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
         compose.onNode(hasContentDescription("Settings") and hasClickAction()).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Sign out", substring = true), timeoutMillis = 10_000)
         compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
@@ -97,7 +123,7 @@ class SmokeTest {
 
         compose.onNode(hasSetTextAction()).performTextInput("912345")
         compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
-        compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
 
         // Revoke the token on the server, then make the screen call the server again → 401 → sign-in.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -116,7 +142,7 @@ class SmokeTest {
         compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
 
         signInAsDemo()
-        compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
         compose.onNodeWithText("Example Refrigeration Co.").assertExists()
     }
 
@@ -159,6 +185,17 @@ class SmokeTest {
             assertTrue("RMA $a should be listed before $b (tops: $ta, $tb)", ta != null && tb != null && ta < tb)
         }
     }
+
+    /** Scrolls Home's lazy list to the work-list card and opens it. */
+    private fun openFromHomeList(rmaId: String) {
+        val card = hasTestTag(HomeTags.workItem(rmaId))
+        compose.waitUntil(timeoutMillis = 20_000) {
+            runCatching { compose.onNode(hasScrollToNodeAction()).performScrollToNode(card) }.isSuccess
+        }
+        compose.onNode(card).performClick()
+    }
+
+    private fun back() = compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
     private fun signInAsDemo() {
         compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
