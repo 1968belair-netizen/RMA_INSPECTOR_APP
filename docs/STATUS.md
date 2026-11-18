@@ -1,4 +1,4 @@
-# Status — 2026-11-18 13:40 ET (coordinator session 2)
+# Status — 2026-11-18 13:40 ET (coordinator session 2, updated after #39 merged)
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
@@ -12,37 +12,38 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 | PR | Issue | Branch | State |
 |---|---|---|---|
 | #37 | #36 A6 "(blank)" product-type chip | `feature/a6-blank-product-type` | build ✅ test ✅, emulator running. Merge when green. |
-| #39 | #5 B1 Findings tab + local drafts | `feature/b1-findings` | **build ✅ emulator ✅, acceptance met, mergeable.** Squash-merge was **blocked by the session's permission check** — needs Jacob's OK or a merge from his side. B2 (#7) waits on this. |
-| #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅ (fixed), emulator running. Merge when green and acceptance met. |
-| (docs) | — | `docs/approve-q3-q4-q6` | Q3, Q4, Q6 moved to decisions.md; STATUS refreshed. |
+| #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅, emulator running. Merge when green and acceptance met. |
+| #42 | — | `docs/approve-q3-q4-q6` | Docs: Q3/4/6 approved; rebased on main after #39. |
+| (coming) | #19 D1 Camera search | `feature/d1-camera-search` | thread started 2026-11-18 ~13:35 |
+| (coming) | #7 B2 Photos | `feature/b2-photos` | thread started 2026-11-18 ~13:35 (B1 merged) |
+
+**Merged this session:** #39 B1 Findings tab (merged by Jacob).
 
 ### Open issues
 | Issue | Milestone | State | Branch | Depends on |
 |---|---|---|---|---|
 | #36 A6 blank product-type chip | A | PR #37 | `feature/a6-blank-product-type` | — |
-| #5 B1 Findings tab | B | PR #39 | `feature/b1-findings` | — |
 | #10 C1 Report tab | C | PR #40 | `feature/c1-report-tab` | — |
-| #7 B2 Photos tab | B | not started | — | B1 (row-photo slot + DraftStore) |
-| #8 B3 Submit inspection | B | not started | — | B1, B2 |
-| #9 B4 Offline queue, conflicts, lock/retry | B | not started | — | B3. Acceptance now includes the 2026-11-18 queue/sign-out rules (held per inspector, sign-out prompt, earlier-session banner, per-inspector queue view, A/B emulator test, second fake mock user) |
+| #7 B2 Photos tab | B | **in progress** | `feature/b2-photos` | B1 ✅ |
+| #19 D1 Camera search | D | **in progress** | `feature/d1-camera-search` | — |
+| #8 B3 Submit inspection | B | not started | — | B2 (B1 ✅) |
+| #9 B4 Offline queue, conflicts, lock/retry | B | not started | — | B3. Acceptance includes the 2026-11-18 queue/sign-out rules |
 | #11 C2 Submit report | C | not started | — | B3 (and C1) |
-| #19 D1 Camera search | D | not started | — | — (can start any time) |
-| #20 D2 Guided inspection | D | not started | — | B1, B2 |
+| #20 D2 Guided inspection | D | not started | — | B2 (B1 ✅) |
 | #34 Idea: pre-filled checklist on Findings | D | **idea — do not implement** | — | decide later |
-| #21 S1 Real server, read-only | server | **ready**. Jacob runs it locally on his work laptop | — | — |
+| #21 S1 Real server, read-only | server | **ready**, local on Jacob's laptop | — | — |
 | #22 S2 Real server, write side | server | later, local | — | matching tablet issues |
 
+(#5 B1 is closed by the merge.)
+
 ## 2. Work in progress and exact next steps
-1. **#37 / #39 / #40:** if a PR is still open, read its issue's latest comment. Then: green CI + acceptance met →
-   rebase on main if needed → squash-merge (standing approval). C1 (#40) had a failing build on its first run; check
-   `gh run view --log-failed` for its latest run.
-2. **After B1 merges**, start **#7 B2 Photos**. It plugs into B1's row-photo slot and DraftStore; see B1's PR / final
-   comment.
-3. **Keep 3 issues in progress:** next candidates are #7 B2 (after B1), #19 D1 camera search (independent), then #8
-   B3 → #9 B4 and #11 C2.
+1. **#37 / #40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
+   still blocked, post "READY TO MERGE: #n" in chat and keep working.
+2. **#7 B2 and #19 D1** are running in Sonnet threads (worktrees `/home/claude/wt-b2`, `/home/claude/wt-d1`).
+3. **Keep 3 issues in progress:** next candidates are #8 B3 (after B2) → #9 B4, #11 C2 (after B3 + C1) and #20 D2.
 4. **After B and C are done**, post one short milestone report covering both (APK link, screenshots, tests, gaps,
    questions). Jacob tests B and C together on his phone.
-5. Worktrees used by threads: `/home/claude/wt-a6`, `/home/claude/wt-b1`, `/home/claude/wt-c1`. These are
+5. Worktrees used by threads: `/home/claude/wt-b2`, `/home/claude/wt-d1` (earlier ones are gone). These are
    session-local; a new session starts from a fresh clone.
 6. Thread rules file (session-local copy): the same content is in CLAUDE.md "Rapid development mode" and below.
 
