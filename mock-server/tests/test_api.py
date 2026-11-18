@@ -295,6 +295,8 @@ def test_photo_list_carries_part_association(client, H):
     assert pics["00-1 Nameplate.jpg"]["part_code"] is None and pics["00-1 Nameplate.jpg"]["seq"] == 0
 
 
-def test_legacy_app_builds_work_when_auth_optional(anon, monkeypatch):
-    monkeypatch.setenv("MOCK_AUTH_OPTIONAL", "1")
-    assert anon.get("/api/v1/inspectors").json()["inspectors"][0]["username"] == "demo"
+def test_no_token_bypass_and_no_inspectors_endpoint(anon, monkeypatch):
+    monkeypatch.setenv("MOCK_AUTH_OPTIONAL", "1")  # the old bypass is gone: ignored
+    r = anon.get("/api/v1/codelists", headers={"X-Inspector": "demo"})
+    assert r.status_code == 401 and r.json()["error"]["code"] == "UNAUTHENTICATED"
+    assert anon.post("/api/v1/auth/login", json={"username": "demo", "password": "demo"}).status_code == 200

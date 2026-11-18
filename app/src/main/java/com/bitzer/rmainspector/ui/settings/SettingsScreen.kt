@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,11 +39,10 @@ import com.bitzer.rmainspector.ui.AppUiState
 import com.bitzer.rmainspector.ui.Connection
 import com.bitzer.rmainspector.ui.components.BitzerTopBar
 import com.bitzer.rmainspector.ui.components.ConnectionBanner
-import com.bitzer.rmainspector.ui.components.InspectorList
 import com.bitzer.rmainspector.ui.components.ScreenHeader
 import com.bitzer.rmainspector.ui.theme.BitzerColors
 
-/** Settings (docs/spec.md §3.14): server address, inspector, app info. */
+/** Settings (docs/spec.md §2, §3.14): server address, signed-in user + Sign out, app info. */
 @Composable
 fun SettingsScreen(
     state: AppUiState,
@@ -50,7 +50,7 @@ fun SettingsScreen(
     onSaveServer: (String) -> String?,
     onResetServer: () -> Unit,
     onTest: () -> Unit,
-    onSelectInspector: (com.bitzer.rmainspector.data.Inspector) -> Unit,
+    onSignOut: () -> Unit,
 ) {
     val saved = state.settings?.serverUrl.orEmpty()
     var text by rememberSaveable { mutableStateOf("") }
@@ -100,19 +100,18 @@ fun SettingsScreen(
                 ConnectionBanner(state.connection)
             }
 
-            ScreenHeader("Inspector", subtitle = "Who is doing the inspections on this device. Used for the audit trail and your initials.")
-            Column(Modifier.padding(horizontal = 24.dp)) {
-                when {
-                    state.inspectors.isNotEmpty() ->
-                        InspectorList(state.inspectors, state.settings?.inspector?.username, onSelectInspector)
-                    state.connection is Connection.Ok ->
-                        Text("The server has no inspectors set up.", style = MaterialTheme.typography.bodyLarge)
-                    else ->
-                        Text(
-                            state.settings?.inspector?.let { "${it.displayName} (${it.initials}) — connect to the server to change." }
-                                ?: "Connect to the server to load the inspector list.",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
+            state.user?.let { user ->
+                ScreenHeader("Signed in", subtitle = "Your initials pre-fill Inspected by and Summary by.")
+                Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        user.displayName + if (user.initials.isNotBlank()) "  (${user.initials})" else "",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text("Username: ${user.username}", style = MaterialTheme.typography.bodyMedium, color = BitzerColors.Grey90)
+                    OutlinedButton(onClick = onSignOut, modifier = Modifier.heightIn(min = 56.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                        Text("  Sign out")
+                    }
                 }
             }
 

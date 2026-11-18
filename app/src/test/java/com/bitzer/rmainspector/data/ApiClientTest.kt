@@ -30,12 +30,48 @@ class ApiClientTest {
     }
 
     @Test
-    fun parsesInspectors() = runBlocking {
+    fun loginParsesTokenAndUser() = runBlocking {
         server.enqueue(MockResponse().setBody(
-            """{"inspectors":[{"username":"jdoe","display_name":"J. Doe","initials":"JD","audit_user_id":"JDOE_SQL"}],
-               "max_inspectors":10,"sign_in_required":false}"""))
-        val r = api.inspectors(base) as ApiResult.Ok
-        assertEquals("JD", r.value.inspectors.single().initials)
+            """{"token":"opaque-token-example","expires_at":null,
+               "user":{"username":"jdoe","display_name":"J. Doe","initials":"JD","audit_user_id":"JDOE_SQL","roles":["all"]}}"""))
+        val r = api.login(base, " jdoe ", "pw", "dev-1") as ApiResult.Ok
+        assertEquals("opaque-token-example", r.value.token)
+        assertEquals("JD", r.value.user.initials)
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/api/v1/auth/login", req.path)
+        assertEquals(null, req.getHeader("Authorization"))
+        val body = req.body.readUtf8()
+        assertTrue(body.contains("\"username\":\"jdoe\"") && body.contains("\"device_id\":\"dev-1\""))
+    }
+
+    @Test
+    fun wrongPasswordShowsExactMessage() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(401).setBody(
+            """{"error":{"code":"INVALID_CREDENTIALS","message":"Bad login.","retryable":false,"details":{}}}"""))
+        var expired: String? = null
+        val client = ApiClient(tokenProvider = { "old" }, onUnauthorized = { expired = it })
+        val r = client.login(base, "demo", "nope", "dev-1") as ApiResult.Failure
+        assertEquals("Wrong username or password.", r.message)
+        assertEquals(null, expired) // a failed sign-in never signs anyone out
+    }
+
+    @Test
+    fun sendsBearerTokenAndReports401() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"username":"demo"}"""))
+        server.enqueue(MockResponse().setResponseCode(401).setBody(
+            """{"error":{"code":"UNAUTHENTICATED","message":"Please sign in.","retryable":false,"details":{}}}"""))
+        var expired: String? = null
+        val client = ApiClient(tokenProvider = { "tok-1" }, onUnauthorized = { expired = it }, appVersion = "0.1.9", deviceIdProvider = { "dev-1" })
+        assertTrue(client.me(base) is ApiResult.Ok)
+        val req = server.takeRequest()
+        assertEquals("Bearer tok-1", req.getHeader("Authorization"))
+        assertEquals("0.1.9", req.getHeader("X-App-Version"))
+        assertEquals("dev-1", req.getHeader("X-Device-Id"))
+        assertEquals(null, req.getHeader("X-Inspector"))
+        val r = client.me(base) as ApiResult.Failure
+        assertEquals(401, r.httpStatus)
+        assertEquals("tok-1", expired)
     }
 
     @Test

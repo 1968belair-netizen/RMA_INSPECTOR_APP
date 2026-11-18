@@ -6,8 +6,11 @@ import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -28,16 +31,38 @@ sealed interface ApiResult<out T> {
 /**
  * Talks to the RMA app server (docs/api.md). URLs are built with OkHttp's HttpUrl so opaque ids such as
  * `rma_id` are always percent-encoded — the tablet never assumes what an id looks like.
+ *
+ * Every call carries `Authorization: Bearer <token>` when signed in (api §1, §3), plus `X-App-Version` and
+ * `X-Device-Id`. A `401` on a call that carried a token reports that token to [onUnauthorized] so the app
+ * can return to sign-in (queued work is kept).
  */
 class ApiClient(
     private val http: OkHttpClient = defaultHttpClient(),
     private val json: Json = defaultJson,
+    private val tokenProvider: () -> String? = { null },
+    private val onUnauthorized: (rejectedToken: String) -> Unit = {},
+    private val appVersion: String = "",
+    private val deviceIdProvider: () -> String? = { null },
 ) {
     suspend fun health(baseUrl: String): ApiResult<Health> =
         get(url(baseUrl, "health"), baseUrl, Health.serializer())
 
-    suspend fun inspectors(baseUrl: String): ApiResult<InspectorsResponse> =
-        get(url(baseUrl, "inspectors"), baseUrl, InspectorsResponse.serializer())
+    /** `POST /auth/login` (api §3). Wrong credentials → [WRONG_CREDENTIALS] as the message. */
+    suspend fun login(baseUrl: String, username: String, password: String, deviceId: String): ApiResult<LoginResponse> {
+        val body = writeJson.encodeToString(LoginRequest.serializer(), LoginRequest(username.trim(), password, deviceId))
+        return when (val r = send(url(baseUrl, "auth", "login"), baseUrl, LoginResponse.serializer(), body.toRequestBody(JSON_TYPE), authorized = false)) {
+            is ApiResult.Failure ->
+                if (r.code == "INVALID_CREDENTIALS" || r.httpStatus == 401) r.copy(message = WRONG_CREDENTIALS) else r
+            is ApiResult.Ok -> r
+        }
+    }
+
+    /** `POST /auth/logout` with an explicit token (the app has usually forgotten it already). Best effort. */
+    suspend fun logout(baseUrl: String, token: String): ApiResult<Unit> =
+        send(url(baseUrl, "auth", "logout"), baseUrl, null, ByteArray(0).toRequestBody(null), authorized = false, explicitToken = token)
+
+    suspend fun me(baseUrl: String): ApiResult<User> =
+        get(url(baseUrl, "me"), baseUrl, User.serializer())
 
     suspend fun codeLists(baseUrl: String): ApiResult<CodeLists> =
         get(url(baseUrl, "codelists"), baseUrl, CodeLists.serializer())
@@ -62,26 +87,45 @@ class ApiClient(
         url: HttpUrl?,
         baseUrl: String,
         deserializer: DeserializationStrategy<T>,
-        inspector: String? = null,
+    ): ApiResult<T> = send(url, baseUrl, deserializer, body = null)
+
+    /**
+     * One request. [body] null = GET, otherwise POST. [deserializer] null = ignore the response body (e.g. 204).
+     * [authorized] false = no stored token is sent (login); [explicitToken] overrides the stored token.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T> send(
+        url: HttpUrl?,
+        baseUrl: String,
+        deserializer: DeserializationStrategy<T>?,
+        body: RequestBody?,
+        authorized: Boolean = true,
+        explicitToken: String? = null,
     ): ApiResult<T> = withContext(Dispatchers.IO) {
         if (url == null) {
             return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
         }
+        val token = explicitToken ?: if (authorized) tokenProvider() else null
         val request = Request.Builder().url(url).apply {
             header("Accept", "application/json")
-            if (inspector != null) header("X-Inspector", inspector)
+            if (appVersion.isNotEmpty()) header("X-App-Version", appVersion)
+            deviceIdProvider()?.let { header("X-Device-Id", it) }
+            if (!token.isNullOrEmpty()) header("Authorization", "Bearer $token")
+            if (body != null) post(body)
         }.build()
         try {
             http.newCall(request).execute().use { resp ->
-                val body = resp.body?.string().orEmpty()
+                val text = resp.body?.string().orEmpty()
                 if (resp.isSuccessful) {
+                    if (deserializer == null) return@use ApiResult.Ok(Unit as T)
                     try {
-                        ApiResult.Ok(json.decodeFromString(deserializer, body))
+                        ApiResult.Ok(json.decodeFromString(deserializer, text))
                     } catch (e: Exception) {
                         ApiResult.Failure(ApiResult.Kind.BAD_RESPONSE, "The server sent an answer the app doesn't understand. Is this the RMA app server?", httpStatus = resp.code)
                     }
                 } else {
-                    val err = runCatching { json.decodeFromString(ApiErrorEnvelope.serializer(), body).error }.getOrNull()
+                    val err = runCatching { json.decodeFromString(ApiErrorEnvelope.serializer(), text).error }.getOrNull()
+                    if (resp.code == 401 && !token.isNullOrEmpty() && explicitToken == null) onUnauthorized(token)
                     ApiResult.Failure(
                         ApiResult.Kind.SERVER_ERROR,
                         err?.message ?: "The server answered with error ${resp.code}.",
@@ -101,6 +145,10 @@ class ApiClient(
     }
 
     companion object {
+        /** Shown on the sign-in screen for `401 INVALID_CREDENTIALS` (issue #16 acceptance: exactly this text). */
+        const val WRONG_CREDENTIALS = "Wrong username or password."
+        private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
+
         /** Reading: tolerant of new/missing fields. */
         val defaultJson = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
 

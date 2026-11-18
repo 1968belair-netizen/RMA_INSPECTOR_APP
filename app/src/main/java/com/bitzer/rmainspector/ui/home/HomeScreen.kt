@@ -137,14 +137,11 @@ fun HomeContent(
                                 }
                             }
                         }
-                        val inspector = app.settings?.inspector
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Person, contentDescription = null, tint = BitzerColors.Grey90)
-                            Text(
-                                if (inspector != null) "  Inspector: ${inspector.displayName} (${inspector.initials})"
-                                else "  Inspector: not set — connect to the server first",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                        app.user?.let { user ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Person, contentDescription = null, tint = BitzerColors.Grey90)
+                                Text("  Inspector: ${user.displayName} (${user.initials})", style = MaterialTheme.typography.bodyLarge)
+                            }
                         }
                     }
                 }

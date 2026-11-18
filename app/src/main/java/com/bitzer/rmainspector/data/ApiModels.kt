@@ -19,19 +19,28 @@ data class Health(
     @SerialName("server_time") val serverTime: String = "",
 )
 
+/** The signed-in user (api §3). Initials pre-fill Inspected by / Summary by. */
 @Serializable
-data class Inspector(
+data class User(
     val username: String,
     @SerialName("display_name") val displayName: String = username,
     val initials: String = "",
     @SerialName("audit_user_id") val auditUserId: String = "",
+    val roles: List<String> = emptyList(),
 )
 
 @Serializable
-data class InspectorsResponse(
-    val inspectors: List<Inspector> = emptyList(),
-    @SerialName("max_inspectors") val maxInspectors: Int = 10,
-    @SerialName("sign_in_required") val signInRequired: Boolean = false,
+data class LoginRequest(
+    val username: String,
+    val password: String,
+    @SerialName("device_id") val deviceId: String,
+)
+
+@Serializable
+data class LoginResponse(
+    val token: String,
+    @SerialName("expires_at") val expiresAt: String? = null,
+    val user: User,
 )
 
 @Serializable
