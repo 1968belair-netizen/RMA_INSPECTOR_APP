@@ -201,7 +201,7 @@ class ApiClient(
      * [authorized] false = no stored token is sent (login); [explicitToken] overrides the stored token.
      */
     @Suppress("UNCHECKED_CAST")
-    private suspend fun <T> send(
+    internal suspend fun <T> send(
         url: HttpUrl?,
         baseUrl: String,
         deserializer: DeserializationStrategy<T>?,

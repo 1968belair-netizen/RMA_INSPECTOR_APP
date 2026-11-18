@@ -17,6 +17,7 @@ import com.bitzer.rmainspector.data.PhotoSettings
 import com.bitzer.rmainspector.data.PhotoSource
 import com.bitzer.rmainspector.data.RmaDetail
 import com.bitzer.rmainspector.data.ServiceLocator
+import com.bitzer.rmainspector.data.SubmitInput
 import com.bitzer.rmainspector.data.toDraftInspector
 import com.bitzer.rmainspector.data.toFindingRows
 import kotlinx.coroutines.Dispatchers
@@ -293,6 +294,39 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
 
     /** Conflict review (spec §6.5) comes with Submit in milestone B. */
     fun reviewChanges() = Unit
+
+    // ------------------------------------------------------------------------------------------ Submit (B3)
+
+    /**
+     * Snapshot for the submit review screen (null while the RMA isn't loaded). Flushes a pending draft write first,
+     * so what is on disk is what is shown.
+     */
+    fun submitInput(): SubmitInput? {
+        val s = _state.value
+        val rma = s.rma ?: return null
+        val user = auth.session.value?.user ?: return null
+        pending.getAndSet(null)?.let { runCatching { runOp(it) } }
+        val d = draft
+        return SubmitInput(
+            rma = rma,
+            base = d?.base ?: rma,
+            baseSignature = d?.baseSignature ?: rma.signature,
+            rows = s.findingRows,
+            pendingPhotos = runCatching { photoStore.pending(user.username, rma.rmaId) }.getOrDefault(emptyList()),
+            codes = s.findings.codes,
+            report = ServiceLocator.reportDrafts(appContext).get(rma.rmaId),
+            username = user.username,
+            deviceId = auth.deviceId,
+        )
+    }
+
+    /** The submit saved the findings: the draft is gone (the submit deleted it) → reload the RMA from the server. */
+    fun afterSubmit() {
+        pending.set(null)
+        draft = null
+        _state.update { it.copy(selection = null) }
+        load()
+    }
 
     // ------------------------------------------------------------------------------------------ Findings
 
