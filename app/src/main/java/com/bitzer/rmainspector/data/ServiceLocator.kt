@@ -51,6 +51,14 @@ object ServiceLocator {
             photoStore ?: PhotoStore(File(context.applicationContext.filesDir, "photos")).also { photoStore = it }
         }
 
+    @Volatile private var guidedStore: GuidedProgressStore? = null
+
+    /** Guided inspection progress per inspector and RMA (spec §5). */
+    fun guidedProgress(context: Context): GuidedProgressStore =
+        guidedStore ?: synchronized(this) {
+            guidedStore ?: GuidedProgressStore(File(context.applicationContext.filesDir, "guided")).also { guidedStore = it }
+        }
+
     @Volatile private var reportDraftStore: ReportDraftStore? = null
 
     /** Report tab drafts (defect code, summary, by-fields, report-photo picks) per RMA. */

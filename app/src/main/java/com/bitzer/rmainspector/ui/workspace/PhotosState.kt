@@ -12,7 +12,7 @@ import com.bitzer.rmainspector.data.PhotoEntry
 /** What the camera is taking a photo for. */
 sealed interface CaptureTarget {
     /** A part photo for the parts row [localId]. */
-    data class Row(val localId: String) : CaptureTarget
+    data class Row(val localId: String, val slot: String? = null) : CaptureTarget
     /** An RMA-level photo with its tag (and free text for "Other"). */
     data class Rma(val tag: String, val tagText: String?) : CaptureTarget
     /** Replace the not-yet-sent photo [photoId]; the camera closes after one shot. */

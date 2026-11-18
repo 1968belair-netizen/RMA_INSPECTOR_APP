@@ -5,6 +5,7 @@ import com.bitzer.rmainspector.data.CodeKey
 import com.bitzer.rmainspector.data.CodeLists
 import com.bitzer.rmainspector.data.DeletedRow
 import com.bitzer.rmainspector.data.FindingRow
+import com.bitzer.rmainspector.data.GuidedProgress
 import com.bitzer.rmainspector.data.RmaDetail
 import com.bitzer.rmainspector.data.toFindingRows
 
@@ -29,6 +30,9 @@ sealed interface GuidedButton {
     data class Continue(val step: Int, val of: Int) : GuidedButton
     data object Complete : GuidedButton
 }
+
+/** The open guided inspection (D2): current step index, and the "Inspection complete" dialog after the last step. */
+data class GuidedRunState(val step: Int = 0, val complete: Boolean = false)
 
 /** Banners under the header (spec §4.1). Shown in the order returned by [workspaceBanners]. */
 sealed interface WorkspaceBanner {
@@ -56,6 +60,8 @@ data class WorkspaceState(
     val selection: String? = null,
     val failureExpanded: Boolean = false,
     val guided: GuidedButton = GuidedButton.Unavailable(""),
+    /** The guided inspection screen (D2) while it is open; null = the normal workspace. */
+    val guidedRun: GuidedRunState? = null,
     val changedElsewhere: Boolean = false,
     val findings: FindingsState = FindingsState(),
     val photos: PhotosState = PhotosState(),
@@ -134,10 +140,15 @@ fun workspaceBanners(rma: RmaDetail, changedElsewhere: Boolean = false): List<Wo
  * Guided button state (spec §5) from the server's checklists (keyed by `product_type_key`). Resumable progress
  * (Continue / Complete) comes with the guided flow in milestone B; read-only RMAs never offer it.
  */
-fun guidedButtonFor(rma: RmaDetail, checklists: Map<String, Checklist>): GuidedButton {
+fun guidedButtonFor(rma: RmaDetail, checklists: Map<String, Checklist>, progress: GuidedProgress? = null): GuidedButton {
     val list = checklists[rma.productTypeKey]
-    return if (list == null || list.steps.isEmpty() || rma.isReadOnly) GuidedButton.Unavailable(rma.productType.ifBlank { "this product type" })
-    else GuidedButton.Start(list.steps.size)
+    if (list == null || list.steps.isEmpty() || rma.isReadOnly) return GuidedButton.Unavailable(rma.productType.ifBlank { "this product type" })
+    val n = list.steps.size
+    return when {
+        progress == null || progress.version != list.version -> GuidedButton.Start(n)
+        progress.finished -> GuidedButton.Complete
+        else -> GuidedButton.Continue(progress.step.coerceIn(0, n - 1) + 1, n)
+    }
 }
 
 /** Label for [GuidedButton] — shown on the header button. */

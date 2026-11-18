@@ -33,6 +33,8 @@ data class LocalPhoto(
     val height: Int = 0,
     @SerialName("sent_at") val sentAt: String? = null,
     @SerialName("server_filename") val serverFilename: String? = null,
+    /** Guided inspection photo slot (`overall`, `detail` …) this photo was taken for; null outside guided mode. */
+    val slot: String? = null,
 ) {
     val isRma: Boolean get() = kind == KIND_RMA
     val isSent: Boolean get() = sentAt != null
