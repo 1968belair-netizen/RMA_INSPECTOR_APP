@@ -4,8 +4,9 @@ Implements `docs/api.md` (rev 7) with **fake data only**, so the tablet app can 
 BITZER's network. The real server (Phase 4) replaces it and reuses `mock_server/naming.py`.
 
 ## Run it
-**Windows, no typing:** double-click `run_mock_server.bat`. It installs the requirements, shows this PC's
-IPv4 address, and starts the server on port 8000. Allow it through Windows Firewall (Private networks) when asked.
+**Windows, no typing:** double-click `run_mock_server.bat`. It installs the requirements, starts the **demo
+dataset** (`MOCK_DATASET=demo`), shows this PC's IPv4 address (with a reminder to use the phone's hotspot) and
+starts the server on port 8000. Allow it through Windows Firewall (Private networks) when asked.
 
 **Command line:**
 ```
@@ -23,7 +24,33 @@ python -m uvicorn mock_server.main:app --host 0.0.0.0 --port 8000
   Other users: set `MOCK_USERS` to JSON, e.g. `{"jdoe": {"password": "x", "display_name": "J. Doe", "initials": "JD"}}`.
 - There is no token-less bypass: the app signs in like it will against the real server.
 
-## Fake RMAs
+## Datasets (`MOCK_DATASET`)
+| `MOCK_DATASET` | Used by | Contents |
+|---|---|---|
+| *(unset)* / anything else | pytest, CI, emulator tests | The test RMAs below (912345 … 912360), empty `checklists`. |
+| `demo` | `run_mock_server.bat`, phone demos | 8 curated RMAs on the work list + 1 finished example, sample checklists, real small JPEGs (`mock_server/fake_images.py`). |
+
+Run the demo by hand: `MOCK_DATASET=demo python -m uvicorn mock_server.main:app --host 0.0.0.0 --port 8000`
+(Windows cmd: `set MOCK_DATASET=demo` first). `POST /mock/reset` (also `/api/v1/_mock/reset`) restores the dataset
+and signs everyone out. Dates are relative to today, so ages stay realistic.
+
+### Demo dataset (`MOCK_DATASET=demo`)
+| RMA | What it shows | On work list |
+|---|---|---|
+| 912364 | Screw, Warranty, **41 days** old (aged) | yes (oldest) |
+| 912361 | Recip, Warranty, 24 d, oil trips; misspellings "Compresser", "scorring", "Bearring" in the text | yes |
+| 912368 | Scroll, Warranty — read only ("Handled in the repair database") | yes |
+| 912366 | Part, Repair & Return | yes |
+| 912362 | Recip, Repair & Return, **core-teardown badge**, "Termnal" misspelling | yes |
+| 912365 | Screw, Repair & Return ("windng" misspelling) | yes |
+| 912363 | Recip, Inspection Only ("Lubercation" misspelling) | yes |
+| 912367 | Transport, Warranty (Transport is added to the demo work-list defaults) | yes |
+| 912369 | **Finished example**: Report Complete, 5 parts, summary, defect code 07, inspected-by, 7 photos, 4 report photos, built report | no (status) |
+
+`checklists` in `/codelists`: `recip` (07, 48a, 49, 34, 35, 37, 44, 46, 63) and a shorter `screw`
+(07, 48a, 34, 35); overall photo always, detail photo when the issue is not `50` Normal.
+
+## Test dataset (default)
 Work list defaults (server settings): status **Received**, product types **Recip / Scroll / Screw / Part**,
 return codes **Inspection Only / Repair & Return / Warranty**, oldest `status_since` first.
 
