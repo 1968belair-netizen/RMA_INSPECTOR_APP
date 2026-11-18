@@ -11,6 +11,10 @@ import com.bitzer.rmainspector.data.DeletedRow
 import com.bitzer.rmainspector.data.Draft
 import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.FindingsEdit
+import com.bitzer.rmainspector.data.LocalPhoto
+import com.bitzer.rmainspector.data.PhotoProcessor
+import com.bitzer.rmainspector.data.PhotoSettings
+import com.bitzer.rmainspector.data.PhotoSource
 import com.bitzer.rmainspector.data.RmaDetail
 import com.bitzer.rmainspector.data.ServiceLocator
 import com.bitzer.rmainspector.data.toDraftInspector
@@ -28,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -46,6 +51,19 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     private val auth = ServiceLocator.auth(app)
     private val drafts = ServiceLocator.drafts(app)
     private val recent = ServiceLocator.recentCodes(app)
+    private val photoStore = ServiceLocator.photos(app)
+    private val appContext = app.applicationContext
+
+    /** Thumbnails for the Photos tab (device files + server thumbnails). */
+    val thumbs = AndroidPhotoThumbs(
+        api, photoStore, rmaId,
+        username = { auth.session.value?.user?.username },
+        baseUrl = { store.settings.first().serverUrl },
+        fileOf = { src ->
+            val u = auth.session.value?.user?.username
+            u?.let { name -> _state.value.photos.local.firstOrNull { it.photoId == src.photoId }?.let { photoStore.file(name, rmaId, it) } }
+        },
+    )
     private val _state = MutableStateFlow(WorkspaceState())
     val state: StateFlow<WorkspaceState> = _state.asStateFlow()
 
@@ -124,6 +142,131 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
                 changedElsewhere = d != null && d.baseSignature != rma.signature,
                 findings = it.findings.copy(rows = d?.rows ?: rma.parts.toFindingRows(), hasDraft = d != null),
             )
+        }
+        loadPhotos(rma.rmaId)
+    }
+
+    // ------------------------------------------------------------------------------------------ Photos
+
+    private fun photoSettings(): PhotoSettings = _state.value.findings.codes?.photo ?: PhotoSettings()
+    private fun username(): String? = auth.session.value?.user?.username
+
+    /** This inspector's photos from the device, then the server's list (desk photos too). */
+    private suspend fun loadPhotos(rmaId: String) {
+        val u = username()
+        val local = if (u == null) emptyList() else withContext(Dispatchers.IO) {
+            runCatching { photoStore.purgeSent(u, rmaId); photoStore.list(u, rmaId) }.getOrDefault(emptyList())
+        }
+        _state.update { it.copy(photos = it.photos.copy(local = local)) }
+        fetchServerPhotos(rmaId)
+    }
+
+    private suspend fun fetchServerPhotos(rmaId: String) {
+        when (val r = api.photoListing(store.settings.first().serverUrl, rmaId)) {
+            is ApiResult.Ok -> {
+                thumbs.clear()
+                _state.update { it.copy(photos = it.photos.copy(server = r.value.allPics, serverLoaded = true, serverError = null)) }
+            }
+            is ApiResult.Failure -> _state.update { it.copy(photos = it.photos.copy(serverError = r.message)) }
+        }
+    }
+
+    fun reloadPhotos() { viewModelScope.launch { fetchServerPhotos(rmaId) } }
+
+    fun dismissPhotoMessage() = _state.update { it.copy(photos = it.photos.copy(message = null)) }
+
+    /** Opens the camera for a part photo of this row. */
+    fun takePhoto(rowLocalId: String) {
+        if (!_state.value.photosEditable) return
+        _state.update { it.copy(photos = it.photos.copy(capture = CaptureTarget.Row(rowLocalId), takenThisSession = 0, message = null)) }
+    }
+
+    fun addRmaPhoto() {
+        if (!_state.value.photosEditable) return
+        _state.update { it.copy(photos = it.photos.copy(tagPicker = TagPickerState(), message = null)) }
+    }
+
+    fun selectTag(tag: String) = _state.update { s -> s.copy(photos = s.photos.copy(tagPicker = s.photos.tagPicker?.copy(tag = tag))) }
+    fun setTagText(text: String) = _state.update { s -> s.copy(photos = s.photos.copy(tagPicker = s.photos.tagPicker?.copy(tagText = text))) }
+    fun cancelTag() = _state.update { it.copy(photos = it.photos.copy(tagPicker = null)) }
+
+    fun confirmTag() {
+        val p = _state.value.photos.tagPicker ?: return
+        val tag = p.tag ?: return
+        val other = tag.equals("Other", ignoreCase = true)
+        if (other && p.tagText.isBlank()) return
+        _state.update { it.copy(photos = it.photos.copy(tagPicker = null, capture = CaptureTarget.Rma(tag, p.tagText.trim().takeIf { other }), takenThisSession = 0)) }
+    }
+
+    fun retakePhoto(photoId: String) {
+        if (!_state.value.photosEditable) return
+        if (_state.value.photos.local.none { it.photoId == photoId && !it.isSent }) return
+        _state.update { it.copy(photos = it.photos.copy(capture = CaptureTarget.Retake(photoId), takenThisSession = 0, message = null)) }
+    }
+
+    fun closeCamera() = _state.update { it.copy(photos = it.photos.copy(capture = null, takenThisSession = 0)) }
+
+    /** Deletes a photo taken on this tablet (it was never sent). */
+    fun deletePhoto(photoId: String) {
+        val u = username() ?: return
+        val rid = rmaId
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { photoStore.remove(u, rid, photoId) } }
+            _state.update { it.copy(selection = if (it.selection == photoId) null else it.selection) }
+            refreshLocalPhotos()
+        }
+    }
+
+    private suspend fun refreshLocalPhotos() {
+        val u = username() ?: return
+        val local = withContext(Dispatchers.IO) { runCatching { photoStore.list(u, rmaId) }.getOrDefault(emptyList()) }
+        _state.update { it.copy(photos = it.photos.copy(local = local)) }
+    }
+
+    /**
+     * The camera delivered a raw JPEG: scale it to the server's size / quality, apply EXIF orientation, drop GPS,
+     * store it on the device and add it to the Photos tab. Nothing is sent here (Submit does that, B3).
+     */
+    fun photoCaptured(raw: File) {
+        val s = _state.value
+        val target = s.photos.capture
+        val u = username()
+        val rma = s.rma
+        if (target == null || u == null || rma == null) { raw.delete(); return }
+        _state.update { it.copy(photos = it.photos.copy(busy = true, message = null)) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val id = java.util.UUID.randomUUID().toString()
+                    val dest = photoStore.newFile(u, rma.rmaId, id)
+                    val done = PhotoProcessor.process(raw, dest, photoSettings())
+                    val photo = when (target) {
+                        is CaptureTarget.Row -> LocalPhoto(id, LocalPhoto.KIND_PART, rowLocalId = target.localId, capturedAt = done.capturedAt, file = dest.name,
+                            bytes = done.bytes, sha256 = done.sha256, width = done.width, height = done.height)
+                        is CaptureTarget.Rma -> LocalPhoto(id, LocalPhoto.KIND_RMA, tag = target.tag, tagText = target.tagText, capturedAt = done.capturedAt, file = dest.name,
+                            bytes = done.bytes, sha256 = done.sha256, width = done.width, height = done.height)
+                        is CaptureTarget.Retake -> {
+                            val old = photoStore.list(u, rma.rmaId).first { it.photoId == target.photoId }
+                            old.copy(photoId = id, capturedAt = done.capturedAt, file = dest.name, bytes = done.bytes, sha256 = done.sha256,
+                                width = done.width, height = done.height)
+                        }
+                    }
+                    if (target is CaptureTarget.Retake) photoStore.replace(u, rma.rmaId, target.photoId, photo) else photoStore.add(u, rma.rmaId, photo)
+                    photo
+                }.also { raw.delete() }
+            }
+            refreshLocalPhotos()
+            result.onSuccess { photo ->
+                _state.update {
+                    val retake = target is CaptureTarget.Retake
+                    it.copy(
+                        selection = if (retake) photo.photoId else it.selection,
+                        photos = it.photos.copy(busy = false, takenThisSession = it.photos.takenThisSession + 1, capture = if (retake) null else it.photos.capture),
+                    )
+                }
+            }.onFailure {
+                _state.update { s2 -> s2.copy(photos = s2.photos.copy(busy = false, message = "The photo couldn't be saved. Try again.")) }
+            }
         }
     }
 
@@ -204,7 +347,8 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
         val sel = _state.value.selection ?: return
         if (sel == nextSelection) return
         val row = rows().firstOrNull { it.localId == sel } ?: return
-        if (row.isBlankNew) commit(rows().filterNot { it.localId == sel })
+        // A new row that holds photos is not blank: dropping it would orphan them.
+        if (row.isBlankNew && _state.value.photos.local.none { it.rowLocalId == sel && !it.isSent }) commit(rows().filterNot { it.localId == sel })
     }
 
     /** Applies new rows and saves the draft (or removes it when the rows match the server again). */

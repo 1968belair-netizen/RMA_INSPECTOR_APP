@@ -107,6 +107,12 @@ abstract class ScreenCatalog(private val device: String) {
     @Test fun findings_empty() = shot("findings_empty") { workspace(ScreenshotData.workspaceFindingsEmpty) }
     @Test fun findings_long_note() = shot("findings_long_note") { workspace(ScreenshotData.workspaceFindingLongNote) }
     @Test fun findings_undo() = shot("findings_undo") { workspace(ScreenshotData.workspaceFindingsUndo) }
+    @Test fun photos_grid_by_part() = shot("photos_grid_by_part") { workspace(ScreenshotData.workspacePhotosGrid) }
+    @Test fun photos_photo_selected() = shot("photos_photo_selected") { workspace(ScreenshotData.workspacePhotoSelected) }
+    @Test fun photos_empty() = shot("photos_empty") { workspace(ScreenshotData.workspacePhotosEmpty) }
+    @Test fun photos_offline() = shot("photos_offline") { workspace(ScreenshotData.workspacePhotosOffline) }
+    @Test fun photos_tag_picker() = shot("photos_tag_picker") { workspace(ScreenshotData.workspaceTagPicker) }
+    @Test fun photos_tag_picker_empty() = shot("photos_tag_picker_empty") { workspace(ScreenshotData.workspaceTagPickerEmpty) }
     @Test fun home_draft_changed() = shot("home_draft_changed") { home(ScreenshotData.homeDraftChanged) }
 
     @Test fun workspace_not_found() = shot("workspace_not_found") {

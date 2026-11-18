@@ -56,6 +56,13 @@ data class Capabilities(
 @Serializable
 data class ProductType(val value: String, val key: String, val capabilities: Capabilities = Capabilities())
 
+/** `/codelists` → `photo` (api §4): long edge in pixels and JPEG quality (spec §9.4: 2048 / 85 by default). */
+@Serializable
+data class PhotoSettings(
+    @SerialName("max_edge_px") val maxEdgePx: Int = 2048,
+    @SerialName("jpeg_quality") val jpegQuality: Int = 85,
+)
+
 /** Codes the server doesn't want offered in pickers (api §4 `hidden`). They still display on existing rows. */
 @Serializable
 data class HiddenCodes(
@@ -110,6 +117,8 @@ data class CodeLists(
     /** Issue code(s) meaning "normal" (Macola: `50`) — listed first and the guided default. */
     @SerialName("normal_issue_codes") val normalIssueCodes: List<CodeKey> = emptyList(),
     @SerialName("photo_tags") val photoTags: List<String> = emptyList(),
+    /** Photo size / quality, a server setting (spec §9.4): the tablet compresses to this before storing. */
+    val photo: PhotoSettings = PhotoSettings(),
     @SerialName("summary_template") val summaryTemplate: String = "",
     val limits: Map<String, Int> = emptyMap(),
     /** Guided inspection lists keyed by `product_type_key` (api §4). Empty in v1. */
