@@ -5,6 +5,13 @@ cd /d "%~dp0"
 if "%MOCK_DATASET%"=="" set MOCK_DATASET=demo
 echo Installing/updating requirements...
 python -m pip install --quiet -r requirements.txt
+if errorlevel 1 (
+  echo.
+  echo ERROR: installing requirements failed - see the messages above. The server will not start.
+  echo If it mentions building Pillow or a wheel, install Python 3.13 from python.org and run this file again.
+  pause
+  exit /b 1
+)
 echo.
 echo Dataset: %MOCK_DATASET%   (demo = 8 curated RMAs + 1 finished example; POST /mock/reset restores it)
 echo.
