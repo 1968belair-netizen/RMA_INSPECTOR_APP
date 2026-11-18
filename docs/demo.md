@@ -26,7 +26,9 @@ hotspot. No BITZER network is needed.
 **Quick check:** the Home screen should list 8 RMAs, oldest first (912364 at the top, 41 days old).
 
 If something doesn't connect: confirm both devices are on the hotspot, the server window is still open, the address
-starts with `http://` and ends with `:8000/api/v1`, and Python was allowed through the firewall.
+starts with `http://` and ends with `:8000/api/v1`, and Python was allowed through the firewall. If the server window
+shows "Failed building wheel for pillow", the requirements are out of date: download the latest repo ZIP again (Pillow
+is now `>=12.3.0`, which has wheels for new Python versions) or install Python 3.13 and re-run.
 
 ## 2. The five-minute script
 
