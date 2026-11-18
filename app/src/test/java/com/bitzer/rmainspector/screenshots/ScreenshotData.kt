@@ -41,7 +41,6 @@ import com.bitzer.rmainspector.ui.workspace.ReportMessage
 import com.bitzer.rmainspector.ui.workspace.ReportPhotosLoad
 import com.bitzer.rmainspector.ui.workspace.ReportPicsConflict
 import com.bitzer.rmainspector.ui.workspace.ReportState
-import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
 import com.bitzer.rmainspector.ui.workspace.WorkspaceLoad
 import com.bitzer.rmainspector.ui.workspace.WorkspaceState
 
