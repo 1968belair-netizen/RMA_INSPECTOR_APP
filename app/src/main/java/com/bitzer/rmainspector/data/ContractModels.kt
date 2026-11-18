@@ -93,6 +93,14 @@ data class Checklist(
     val steps: List<ChecklistStep> = emptyList(),
 )
 
+/** `/codelists` → `status_roles` (api §4). Codes are the status codes of `inspection_statuses`. */
+@Serializable
+data class StatusRoles(
+    val inspected: String = "Inspected",
+    @SerialName("report_complete") val reportComplete: String = "Report Complete",
+    @SerialName("report_sent") val reportSent: List<String> = listOf("Sent to RSM", "Issued to Customer"),
+)
+
 @Serializable
 data class CodeLists(
     val version: String = "",
@@ -125,6 +133,8 @@ data class CodeLists(
     val checklists: Map<String, Checklist> = emptyMap(),
     /** Report settings (api §4): pages per photo page, fixed pages. */
     val report: ReportSettings = ReportSettings(),
+    /** Which statuses mean "inspected", "report complete" and "report already sent" (api §4; submit dialogs, spec §6). */
+    @SerialName("status_roles") val statusRoles: StatusRoles = StatusRoles(),
 ) {
     /** The cause picker is shown only when the server sends causes (none for Macola). */
     val causesEnabled: Boolean get() = causes.isNotEmpty()

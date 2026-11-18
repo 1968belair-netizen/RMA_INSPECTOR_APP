@@ -115,6 +115,8 @@ data class WorkspaceCallbacks(
     val onDismissPhotoMessage: () -> Unit = {},
     /** Report tab actions (C1). */
     val report: ReportCallbacks = ReportCallbacks(),
+    /** Submit inspection actions (B3). */
+    val submit: SubmitCallbacks = SubmitCallbacks(),
 )
 
 /** Width from which the tabs show list and detail side by side (11" tablet landscape ≈ 1280 dp). */
@@ -122,15 +124,31 @@ val TWO_PANE_MIN_WIDTH = 840.dp
 
 /** Inspection workspace (spec §4): persistent header, banners, Findings / Photos / Report tabs. */
 @Composable
-fun WorkspaceScreen(onBack: () -> Unit, vm: WorkspaceViewModel = viewModel(), reportVm: ReportViewModel = viewModel()) {
+fun WorkspaceScreen(
+    onBack: () -> Unit,
+    vm: WorkspaceViewModel = viewModel(),
+    reportVm: ReportViewModel = viewModel(),
+    submitVm: SubmitViewModel = viewModel(),
+) {
     val base by vm.state.collectAsStateWithLifecycle()
     val report by reportVm.state.collectAsStateWithLifecycle()
+    val submit by submitVm.phase.collectAsStateWithLifecycle()
     val rma = base.rma
     LaunchedEffect(rma) { if (rma != null) reportVm.setRma(rma) }
-    val state = base.copy(report = report)
+    // The submit saved something: the draft is gone, so reload the RMA from the server.
+    LaunchedEffect(Unit) { submitVm.refresh.collect { vm.afterSubmit() } }
+    val state = base.copy(report = report, submit = submit)
     WorkspaceContent(
         state,
         WorkspaceCallbacks(
+            submit = SubmitCallbacks(
+                onOpen = { submitVm.open(vm.submitInput()) },
+                onCancel = submitVm::cancel,
+                onSubmit = submitVm::submit,
+                onConfirmWarning = submitVm::confirmWarning,
+                onDismissWarning = submitVm::dismissWarning,
+                onClose = submitVm::close,
+            ),
             report = ReportCallbacks(
                 onToggleShowAll = reportVm::toggleShowAll,
                 onEnlarge = reportVm::enlarge,
@@ -200,6 +218,7 @@ fun WorkspaceContent(
         Box(Modifier.fillMaxSize()) {
             WorkspaceScaffold(state, callbacks)
             TagPickerOverlay(state, callbacks)
+            SubmitOverlay(state.submit, callbacks.submit)
             overlay(state, callbacks)
         }
     }
@@ -215,6 +234,13 @@ private fun WorkspaceScaffold(state: WorkspaceState, callbacks: WorkspaceCallbac
                     IconButton(onClick = callbacks.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
+                    if (state.submitAvailable) {
+                        TextButton(
+                            onClick = callbacks.submit.onOpen,
+                            modifier = Modifier.heightIn(min = 56.dp).testTag(SubmitTags.OPEN),
+                            colors = ButtonDefaults.textButtonColors(contentColor = BitzerColors.Green50),
+                        ) { Text("SUBMIT", fontWeight = FontWeight.Bold) }
+                    }
                     IconButton(onClick = callbacks.onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
                 },
             )
