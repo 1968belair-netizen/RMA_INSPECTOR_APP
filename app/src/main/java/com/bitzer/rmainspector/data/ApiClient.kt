@@ -101,10 +101,19 @@ class ApiClient(
     suspend fun search(baseUrl: String, query: String): ApiResult<SearchResponse> =
         get(url(baseUrl, "rmas", "search", query = mapOf("q" to query.trim())), baseUrl, SearchResponse.serializer())
 
-    /** Work list. Empty [statuses] = server default. */
-    suspend fun workList(baseUrl: String, statuses: List<CodeKey>, limit: Int = 50): ApiResult<WorkListResponse> {
+    /**
+     * Work list (api §5). [productTypes] / [returnCodes] = the selected chips; null = leave the parameter out
+     * (server default). An empty list sends an empty value, which matches nothing.
+     */
+    suspend fun workList(
+        baseUrl: String,
+        productTypes: List<String>?,
+        returnCodes: List<CodeKey>?,
+        limit: Int = 200,
+    ): ApiResult<WorkListResponse> {
         val q = buildMap {
-            if (statuses.isNotEmpty()) put("inspection_status", StatusQuery.format(statuses))
+            if (productTypes != null) put("product_type", productTypes.joinToString(","))
+            if (returnCodes != null) put("return_code", CodeQuery.format(returnCodes))
             put("limit", limit.toString())
         }
         return get(url(baseUrl, "rmas", query = q), baseUrl, WorkListResponse.serializer())
@@ -217,8 +226,8 @@ sealed interface CodeListFetch {
     data class Fresh(val raw: String, val etag: String?, val lists: CodeLists) : CodeListFetch
 }
 
-/** `inspection_status` query value: comma-separated codes; `group:code` when a group is present (api §5). */
-object StatusQuery {
+/** Code list query value (e.g. `return_code`): comma-separated codes; `group:code` when a group is present (api §5). */
+object CodeQuery {
     fun format(statuses: List<CodeKey>): String =
         statuses.joinToString(",") { if (it.group.isNullOrEmpty()) it.code else "${it.group}:${it.code}" }
 }

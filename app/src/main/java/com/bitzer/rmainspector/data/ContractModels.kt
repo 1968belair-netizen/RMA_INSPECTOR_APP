@@ -78,6 +78,12 @@ data class CodeLists(
     @SerialName("summary_blocks") val summaryBlocks: List<SummaryBlockDef> = emptyList(),
     @SerialName("product_types") val productTypes: List<ProductType> = emptyList(),
     @SerialName("work_list_statuses") val workListStatuses: List<CodeKey> = emptyList(),
+    /** Every return code the server knows (work-list chips; api §4). */
+    @SerialName("return_codes") val returnCodes: List<Code> = emptyList(),
+    /** Default product-type chips for the work list (server setting). */
+    @SerialName("work_list_product_types") val workListProductTypes: List<String> = emptyList(),
+    /** Default return-code chips for the work list (server setting). */
+    @SerialName("work_list_return_codes") val workListReturnCodes: List<CodeKey> = emptyList(),
     val hidden: HiddenCodes = HiddenCodes(),
     /** Issue code(s) meaning "normal" (Macola: `50`) — listed first and the guided default. */
     @SerialName("normal_issue_codes") val normalIssueCodes: List<CodeKey> = emptyList(),

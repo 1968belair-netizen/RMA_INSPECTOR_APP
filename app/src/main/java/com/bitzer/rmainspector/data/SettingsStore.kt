@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.builtins.ListSerializer
 
 private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
@@ -19,7 +18,10 @@ data class AppSettings(
 class SettingsStore(private val context: Context, private val defaultServerUrl: String) {
     private object Keys {
         val SERVER = stringPreferencesKey("server_url")
-        val WORK_LIST_FILTER = stringPreferencesKey("work_list_filter")
+        /** Product-type + return-code chips (A4). */
+        val WORK_LIST_FILTER = stringPreferencesKey("work_list_chips")
+        /** Pre-A4 status chips — no longer used. */
+        val OLD_STATUS_FILTER = stringPreferencesKey("work_list_filter")
     }
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { it.toSettings() }
@@ -28,17 +30,22 @@ class SettingsStore(private val context: Context, private val defaultServerUrl: 
         serverUrl = this[Keys.SERVER] ?: defaultServerUrl,
     )
 
-    /** Remembered work-list status filter; null = never chosen (use the server default). */
-    val workListFilter: Flow<List<CodeKey>?> = context.settingsDataStore.data.map { p ->
+    /** Remembered work-list chips (spec §3.3); null = never chosen (use the server defaults). Kept across sign-out. */
+    val workListFilter: Flow<WorkListFilter?> = context.settingsDataStore.data.map { p ->
         p[Keys.WORK_LIST_FILTER]?.let { raw ->
-            runCatching { ApiClient.defaultJson.decodeFromString(ListSerializer(CodeKey.serializer()), raw) }.getOrNull()
+            runCatching { ApiClient.defaultJson.decodeFromString(WorkListFilter.serializer(), raw) }.getOrNull()
         }
     }
 
-    suspend fun setWorkListFilter(statuses: List<CodeKey>) {
+    suspend fun setWorkListFilter(filter: WorkListFilter) {
         context.settingsDataStore.edit {
-            it[Keys.WORK_LIST_FILTER] = ApiClient.writeJson.encodeToString(ListSerializer(CodeKey.serializer()), statuses)
+            it[Keys.WORK_LIST_FILTER] = ApiClient.writeJson.encodeToString(WorkListFilter.serializer(), filter)
         }
+    }
+
+    /** Back to the server defaults (used by emulator tests). */
+    suspend fun clearWorkListFilter() {
+        context.settingsDataStore.edit { it.remove(Keys.WORK_LIST_FILTER); it.remove(Keys.OLD_STATUS_FILTER) }
     }
 
     suspend fun setServerUrl(url: String) {
