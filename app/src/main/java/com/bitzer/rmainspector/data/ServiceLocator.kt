@@ -2,6 +2,7 @@ package com.bitzer.rmainspector.data
 
 import android.content.Context
 import com.bitzer.rmainspector.BuildConfig
+import java.io.File
 
 /** One settings store, one session store and one HTTP client for the whole app. */
 object ServiceLocator {
@@ -17,6 +18,22 @@ object ServiceLocator {
             deviceIdProvider = { authStore?.deviceId },
         )
     }
+
+    @Volatile private var codeListRepo: CodeListRepository? = null
+    @Volatile private var recent: RecentCodesStore? = null
+
+    /** Code lists kept on the device (spec §4.3). */
+    fun codeLists(context: Context): CodeListRepository =
+        codeListRepo ?: synchronized(this) {
+            codeListRepo ?: CodeListRepository(api.asCodeListSource(),
+                FileCodeListCache(File(context.applicationContext.filesDir, "codelists/codelists.json"))).also { codeListRepo = it }
+        }
+
+    /** "Recently used" codes per picker. */
+    fun recentCodes(context: Context): RecentCodesStore =
+        recent ?: synchronized(this) {
+            recent ?: RecentCodesStore(File(context.applicationContext.filesDir, "codelists/recent.json")).also { recent = it }
+        }
 
     fun settings(context: Context): SettingsStore =
         store ?: synchronized(this) {

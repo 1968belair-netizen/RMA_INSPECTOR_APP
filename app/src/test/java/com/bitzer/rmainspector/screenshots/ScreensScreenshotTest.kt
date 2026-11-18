@@ -3,6 +3,19 @@ package com.bitzer.rmainspector.screenshots
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.bitzer.rmainspector.data.CodeKey
+import com.bitzer.rmainspector.data.CodePicking
+import com.bitzer.rmainspector.ui.components.CodePickerList
+import com.bitzer.rmainspector.ui.components.DropdownField
+import com.bitzer.rmainspector.ui.components.MultiSelectChipRow
 import com.bitzer.rmainspector.ui.home.HomeContent
 import com.bitzer.rmainspector.ui.home.HomeState
 import com.bitzer.rmainspector.ui.rma.OverviewState
@@ -56,6 +69,50 @@ abstract class ScreenCatalog(private val device: String) {
     @Test fun rma_locked() = shot("rma_locked") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rmaLocked), {}, {}) }
     @Test fun rma_scroll_read_only() = shot("rma_scroll_read_only") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rmaScroll), {}, {}) }
     @Test fun rma_not_found() = shot("rma_not_found") { RmaOverviewContent(OverviewState.Error("RMA 999 was not found.", notFound = true), {}, {}) }
+
+    // --- Shared code pickers (A3)
+    @Test fun dropdown_closed() = shot("dropdown_closed") {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(24.dp)) {
+                DropdownField("Part", selected = ScreenshotData.manyParts.first { it.code == "48a" }, onClick = {})
+                Spacer(Modifier.height(16.dp))
+                DropdownField("Issue", selected = ScreenshotData.issueCodes.first { it.code == "50" }, onClick = {})
+                Spacer(Modifier.height(16.dp))
+                DropdownField("Cause", selected = null, onClick = {})
+            }
+        }
+    }
+
+    @Composable
+    private fun picker(title: String, items: List<com.bitzer.rmainspector.data.Code>, query: String, pinned: List<CodeKey> = emptyList(),
+                       recent: List<CodeKey> = emptyList(), selected: CodeKey? = null) {
+        val arranged = CodePicking.arrange(items, pinned)
+        val filtered = CodePicking.filter(arranged, query)
+        Surface(Modifier.fillMaxSize()) {
+            CodePickerList(title, query, {}, CodePicking.rows(filtered, pinned, withHeaders = query.isBlank()),
+                CodePicking.recent(arranged, recent), selected, {}, onClose = {})
+        }
+    }
+
+    @Test fun dropdown_open_issues() = shot("dropdown_open_issues") {
+        picker("Issue", ScreenshotData.issueCodes, "", ScreenshotData.normalIssues, selected = CodeKey(null, "50"))
+    }
+    @Test fun dropdown_open_long() = shot("dropdown_open_long") {
+        picker("Part", ScreenshotData.manyParts, "", recent = ScreenshotData.recentParts, selected = CodeKey(null, "48a"))
+    }
+    @Test fun dropdown_filtered() = shot("dropdown_filtered") { picker("Part", ScreenshotData.manyParts, "48") }
+    @Test fun dropdown_no_match() = shot("dropdown_no_match") { picker("Part", ScreenshotData.manyParts, "zzz") }
+
+    @Test fun chip_row() = shot("chip_row") {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(24.dp)) {
+                MultiSelectChipRow(ScreenshotData.productTypeChips, setOf(CodeKey(null, "Recip"), CodeKey(null, "Screw")), {},
+                    label = "Product type")
+                Spacer(Modifier.height(16.dp))
+                MultiSelectChipRow(ScreenshotData.returnCodeChips, setOf(CodeKey(null, "Warranty")), {}, label = "Return code")
+            }
+        }
+    }
 
     @Test fun settings() = shot("settings") {
         SettingsScreen(ScreenshotData.appOk, onBack = {}, onSaveServer = { null }, onResetServer = {}, onTest = {}, onSignOut = {})

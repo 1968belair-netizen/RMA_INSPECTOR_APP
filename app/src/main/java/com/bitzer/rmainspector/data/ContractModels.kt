@@ -13,6 +13,8 @@ data class Code(
     val group: String? = null,
     val code: String,
     val description: String = "",
+    /** Server asks for this code to be listed first in pickers (e.g. `50` Normal). Read-only hint. */
+    @SerialName("pin_first") val pinFirst: Boolean = false,
 ) {
     val key: CodeKey get() = CodeKey(group, code)
     val label: String get() = if (description.isBlank()) code else "$code  $description"
@@ -54,6 +56,14 @@ data class Capabilities(
 @Serializable
 data class ProductType(val value: String, val key: String, val capabilities: Capabilities = Capabilities())
 
+/** Codes the server doesn't want offered in pickers (api §4 `hidden`). They still display on existing rows. */
+@Serializable
+data class HiddenCodes(
+    val parts: List<CodeKey> = emptyList(),
+    val issues: List<CodeKey> = emptyList(),
+    val causes: List<CodeKey> = emptyList(),
+)
+
 @Serializable
 data class CodeLists(
     val version: String = "",
@@ -68,6 +78,9 @@ data class CodeLists(
     @SerialName("summary_blocks") val summaryBlocks: List<SummaryBlockDef> = emptyList(),
     @SerialName("product_types") val productTypes: List<ProductType> = emptyList(),
     @SerialName("work_list_statuses") val workListStatuses: List<CodeKey> = emptyList(),
+    val hidden: HiddenCodes = HiddenCodes(),
+    /** Issue code(s) meaning "normal" (Macola: `50`) — listed first and the guided default. */
+    @SerialName("normal_issue_codes") val normalIssueCodes: List<CodeKey> = emptyList(),
     @SerialName("photo_tags") val photoTags: List<String> = emptyList(),
     @SerialName("summary_template") val summaryTemplate: String = "",
     val limits: Map<String, Int> = emptyMap(),
