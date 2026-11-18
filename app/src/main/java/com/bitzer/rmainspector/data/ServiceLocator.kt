@@ -43,6 +43,14 @@ object ServiceLocator {
             draftStore ?: DraftStore(File(context.applicationContext.filesDir, "drafts")).also { draftStore = it }
         }
 
+    @Volatile private var photoStore: PhotoStore? = null
+
+    /** Photos taken on this tablet, stored before anything is sent (spec §6.3). */
+    fun photos(context: Context): PhotoStore =
+        photoStore ?: synchronized(this) {
+            photoStore ?: PhotoStore(File(context.applicationContext.filesDir, "photos")).also { photoStore = it }
+        }
+
     fun settings(context: Context): SettingsStore =
         store ?: synchronized(this) {
             store ?: SettingsStore(context.applicationContext, BuildConfig.DEFAULT_SERVER_URL).also { store = it }

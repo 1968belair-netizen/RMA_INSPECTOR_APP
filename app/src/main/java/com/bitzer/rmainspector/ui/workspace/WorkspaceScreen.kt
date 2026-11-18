@@ -53,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,6 +99,19 @@ data class WorkspaceCallbacks(
     val onDeleteRow: (localId: String) -> Unit = {},
     val onUndoDelete: () -> Unit = {},
     val onDismissUndo: () -> Unit = {},
+    // Photos (B2): rows are addressed by FindingRow.localId, photos by photo id (`PhotoItem.id`).
+    val onTakePhoto: (rowLocalId: String) -> Unit = {},
+    val onAddRmaPhoto: () -> Unit = {},
+    val onSelectTag: (String) -> Unit = {},
+    val onTagText: (String) -> Unit = {},
+    val onConfirmTag: () -> Unit = {},
+    val onCancelTag: () -> Unit = {},
+    val onRetakePhoto: (photoId: String) -> Unit = {},
+    val onDeletePhoto: (photoId: String) -> Unit = {},
+    val onPhotoCaptured: (java.io.File) -> Unit = {},
+    val onCloseCamera: () -> Unit = {},
+    val onReloadPhotos: () -> Unit = {},
+    val onDismissPhotoMessage: () -> Unit = {},
 )
 
 /** Width from which the tabs show list and detail side by side (11" tablet landscape ≈ 1280 dp). */
@@ -126,13 +140,44 @@ fun WorkspaceScreen(onBack: () -> Unit, vm: WorkspaceViewModel = viewModel()) {
             onDeleteRow = vm::deleteRow,
             onUndoDelete = vm::undoDelete,
             onDismissUndo = vm::dismissUndo,
+            onTakePhoto = vm::takePhoto,
+            onAddRmaPhoto = vm::addRmaPhoto,
+            onSelectTag = vm::selectTag,
+            onTagText = vm::setTagText,
+            onConfirmTag = vm::confirmTag,
+            onCancelTag = vm::cancelTag,
+            onRetakePhoto = vm::retakePhoto,
+            onDeletePhoto = vm::deletePhoto,
+            onPhotoCaptured = vm::photoCaptured,
+            onCloseCamera = vm::closeCamera,
+            onReloadPhotos = vm::reloadPhotos,
+            onDismissPhotoMessage = vm::dismissPhotoMessage,
         ),
+        thumbs = vm.thumbs,
+        overlay = { s, cb -> if (s.photos.capture != null) CameraOverlay(s.photos, cb) },
     )
 }
 
 /** Stateless workspace — used by [WorkspaceScreen] and by screenshot tests. */
 @Composable
-fun WorkspaceContent(state: WorkspaceState, callbacks: WorkspaceCallbacks) {
+fun WorkspaceContent(
+    state: WorkspaceState,
+    callbacks: WorkspaceCallbacks,
+    thumbs: PhotoThumbLoader? = null,
+    /** Extra full-screen layer; the app puts the camera here so screenshot tests never touch CameraX. */
+    overlay: @Composable (WorkspaceState, WorkspaceCallbacks) -> Unit = { _, _ -> },
+) {
+    CompositionLocalProvider(LocalPhotoThumbs provides (thumbs ?: LocalPhotoThumbs.current)) {
+        Box(Modifier.fillMaxSize()) {
+            WorkspaceScaffold(state, callbacks)
+            TagPickerOverlay(state, callbacks)
+            overlay(state, callbacks)
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceScaffold(state: WorkspaceState, callbacks: WorkspaceCallbacks) {
     Scaffold(
         topBar = {
             BitzerTopBar(
@@ -326,7 +371,7 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
         Box(m.testTag(WorkspaceTags.listPane(tab))) {
             when (tab) {
                 WorkspaceTab.FINDINGS -> FindingsList(state, cb)
-                WorkspaceTab.PHOTOS -> PhotosList(rma, state.selection, cb.onSelect)
+                WorkspaceTab.PHOTOS -> PhotosList(state, cb)
                 WorkspaceTab.REPORT -> ReportList(rma, state.selection, cb.onSelect)
             }
         }
@@ -335,7 +380,7 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
         Box(m.testTag(WorkspaceTags.detailPane(tab))) {
             when (tab) {
                 WorkspaceTab.FINDINGS -> FindingSheet(state, cb)
-                WorkspaceTab.PHOTOS -> PhotosDetail(rma, state.selection)
+                WorkspaceTab.PHOTOS -> PhotosDetail(state, cb)
                 WorkspaceTab.REPORT -> ReportDetail(rma)
             }
         }
@@ -357,37 +402,6 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
             }
             HorizontalDivider(color = BitzerColors.Grey30)
             detail(Modifier.weight(1f).fillMaxWidth())
-        }
-    }
-}
-
-// --- Photos (placeholder until B2)
-
-@Composable
-private fun PhotosList(rma: RmaDetail, selection: String?, onSelect: (String?) -> Unit) {
-    val p = rma.photos
-    Column(Modifier.fillMaxSize()) {
-        PaneTitle("Photos", if (p.folderFound) "${p.count} in ${p.folderDisplay}" else "No folder yet")
-        LazyColumn(Modifier.weight(1f)) {
-            if (p.files.isEmpty()) item { EmptyText(if (p.folderFound) "No photos yet." else "No photo folder yet — it's created with the first photo.") }
-            itemsIndexed(p.files, key = { _, f -> f }) { _, f ->
-                ListRow(selected = f == selection, onClick = { onSelect(f) }) {
-                    Text(f, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PhotosDetail(rma: RmaDetail, selection: String?) {
-    DetailColumn {
-        if (selection == null) {
-            Placeholder("Select a photo to see it here.", "Thumbnails, the camera and photo naming come in milestone B.")
-        } else {
-            PaneTitle("Photo", null)
-            DetailField("File", selection)
-            DetailField("Folder", rma.photos.folderDisplay)
         }
     }
 }

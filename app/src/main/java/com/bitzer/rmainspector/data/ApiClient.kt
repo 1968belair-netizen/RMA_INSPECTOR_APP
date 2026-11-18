@@ -122,6 +122,30 @@ class ApiClient(
     suspend fun rmaDetail(baseUrl: String, rmaId: String): ApiResult<RmaDetail> =
         get(url(baseUrl, "rmas", rmaId), baseUrl, RmaDetail.serializer())
 
+    /** `GET /rmas/{id}/photos` (api §8): the files in `All Pics`, with their part links. */
+    suspend fun listPhotos(baseUrl: String, rmaId: String): ApiResult<PhotoListResponse> =
+        get(url(baseUrl, "rmas", rmaId, "photos"), baseUrl, PhotoListResponse.serializer())
+
+    /**
+     * `GET /rmas/{id}/photos/all/{filename}?size=thumb|full` (api §8). Returns the JPEG bytes; the caller decodes
+     * them. Desk photos show up here too, so thumbnails always come from the server, never from the tablet.
+     */
+    suspend fun photoBytes(baseUrl: String, rmaId: String, filename: String, thumb: Boolean = true): ApiResult<ByteArray> =
+        withContext(Dispatchers.IO) {
+            val url = url(baseUrl, "rmas", rmaId, "photos", "all", filename, query = mapOf("size" to if (thumb) "thumb" else "full"))
+                ?: return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
+            val token = tokenProvider()
+            val request = requestBuilder(url, token).header("Accept", "image/jpeg").build()
+            try {
+                http.newCall(request).execute().use { resp ->
+                    if (resp.isSuccessful) ApiResult.Ok(resp.body?.bytes() ?: ByteArray(0))
+                    else errorResult(resp.code, resp.body?.string().orEmpty(), token, reportUnauthorized = true)
+                }
+            } catch (e: IOException) {
+                unreachable(baseUrl)
+            }
+        }
+
     suspend fun <T> get(
         url: HttpUrl?,
         baseUrl: String,

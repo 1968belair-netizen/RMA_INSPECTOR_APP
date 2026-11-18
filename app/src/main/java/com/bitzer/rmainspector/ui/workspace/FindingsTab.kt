@@ -125,7 +125,7 @@ internal fun FindingsList(state: WorkspaceState, cb: WorkspaceCallbacks) {
                     )
                 }
             } else {
-                FindingRows(rows, state.selection, editable, f.photoCounts, cb.onSelect, cb.onMoveRow)
+                FindingRows(rows, state.selection, editable, state.photoCounts, cb.onSelect, cb.onMoveRow)
             }
         }
         f.undo?.let { u ->
@@ -407,7 +407,7 @@ internal fun FindingSheet(state: WorkspaceState, cb: WorkspaceCallbacks) {
                     modifier = Modifier.fillMaxWidth().testTag(FindingsTags.NOTE),
                 )
             }
-            RowPhotosSlot(row, f.photoCounts[id] ?: 0, editable)
+            RowPhotos(state, id, cb)
             if (editable) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = { cb.onMoveRow(index, index - 1) }, enabled = index > 0,
@@ -429,36 +429,6 @@ internal fun FindingSheet(state: WorkspaceState, cb: WorkspaceCallbacks) {
                     }
                 }
             }
-        }
-    }
-}
-
-/**
- * Photos of this row — the slot B2 (#7) fills (take / retake / delete, filename preview, keyed by
- * [FindingRow.localId]). Until then it only shows the count the state carries.
- */
-@Composable
-private fun RowPhotosSlot(@Suppress("UNUSED_PARAMETER") row: FindingRow, count: Int, editable: Boolean) {
-    Column(Modifier.testTag(FindingsTags.ROW_PHOTOS)) {
-        Text("PHOTOS FOR THIS ROW", style = MaterialTheme.typography.labelLarge, color = BitzerColors.Grey90)
-        Spacer(Modifier.size(4.dp))
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 88.dp)
-                .border(1.dp, BitzerColors.Grey30, RoundedCornerShape(4.dp))
-                .background(BitzerColors.Grey10)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.PhotoCamera, contentDescription = null, tint = BitzerColors.Grey60, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.width(12.dp))
-            Text(
-                when {
-                    count > 0 -> "$count photo${if (count == 1) "" else "s"}"
-                    editable -> "Row photos come with the camera step (next update)."
-                    else -> "No photos for this row."
-                },
-                style = MaterialTheme.typography.bodyLarge, color = BitzerColors.Grey60,
-            )
         }
     }
 }

@@ -58,6 +58,7 @@ data class WorkspaceState(
     val guided: GuidedButton = GuidedButton.Unavailable(""),
     val changedElsewhere: Boolean = false,
     val findings: FindingsState = FindingsState(),
+    val photos: PhotosState = PhotosState(),
 ) {
     val rma: RmaDetail? get() = (load as? WorkspaceLoad.Loaded)?.rma
     val banners: List<WorkspaceBanner> get() = rma?.let { workspaceBanners(it, changedElsewhere) }.orEmpty()
@@ -77,7 +78,6 @@ data class WorkspaceState(
  * - [codes]: code lists on the device (pickers); null until loaded.
  * - [recentParts] / [recentIssues] / [recentCauses]: "recently used" strips of the pickers.
  * - [undo]: the last deleted row, while its Undo is offered.
- * - [photoCounts]: photos per row, keyed by [FindingRow.localId] — filled by B2 (#7); empty until then.
  */
 data class FindingsState(
     val rows: List<FindingRow>? = null,
@@ -87,7 +87,6 @@ data class FindingsState(
     val recentIssues: List<CodeKey> = emptyList(),
     val recentCauses: List<CodeKey> = emptyList(),
     val undo: DeletedRow? = null,
-    val photoCounts: Map<String, Int> = emptyMap(),
 ) {
     /** Note limit from the server (`limits.note`), 4000 by default. */
     val noteLimit: Int get() = codes?.limits?.get("note") ?: DEFAULT_NOTE_LIMIT
