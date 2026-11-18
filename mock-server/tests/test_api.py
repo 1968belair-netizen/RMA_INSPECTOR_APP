@@ -65,6 +65,17 @@ def test_sign_in_required_and_token_lifecycle(anon):
     assert anon.get("/api/v1/me", headers=h).status_code == 401
 
 
+def test_second_fake_user_demo2_signs_in_with_own_identity(anon):
+    ok = anon.post("/api/v1/auth/login", json={"username": "demo2", "password": "demo2", "device_id": "t"})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["user"]["username"] == "demo2" and body["user"]["initials"] == "D2"
+    h = {"Authorization": "Bearer " + body["token"]}
+    assert anon.get("/api/v1/me", headers=h).json()["audit_user_id"] == "DEMO2_SQL"
+    # Another user's password does not work for this one.
+    assert anon.post("/api/v1/auth/login", json={"username": "demo2", "password": "demo"}).status_code == 401
+
+
 def test_work_list_received_only_filtered_and_oldest_first(client):
     cl = client.get("/api/v1/codelists").json()
     assert [s["code"] for s in cl["work_list_statuses"]] == ["Received"]

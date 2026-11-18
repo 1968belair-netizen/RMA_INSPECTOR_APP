@@ -93,6 +93,8 @@ REPORT_SENT_STATUSES = ["Sent to RSM", "Issued to Customer"]
 # The real server keeps its users in a server-side setting, never in the repo.
 DEFAULT_USERS = {
     "demo": {"password": "demo", "display_name": "Demo Inspector", "initials": "DI"},
+    # A second fake inspector, for tests of held uploads (queue items belong to the inspector who made them).
+    "demo2": {"password": "demo2", "display_name": "Second Inspector", "initials": "D2"},
 }
 
 SUMMARY_TEMPLATE = (
