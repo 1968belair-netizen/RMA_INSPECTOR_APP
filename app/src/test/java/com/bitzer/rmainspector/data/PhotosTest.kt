@@ -55,8 +55,8 @@ class PhotosTest {
 
     @Test fun nextNumberFollowsServerFiles() {
         val rows = listOf(FindingRow("a", partCode = Code(null, "07a", "Terminal box"), issueCode = Code(null, "50", "Normal")))
-        val server = listOf(ServerPhoto("01-1 Terminal box - 50 Normal.jpg", seq = 1), ServerPhoto("01-2 Terminal box - 50 Normal.jpg", seq = 1),
-            ServerPhoto("00-3 Nameplate.jpg", seq = 0))
+        val server = listOf(PhotoEntry("01-1 Terminal box - 50 Normal.jpg", seq = 1), PhotoEntry("01-2 Terminal box - 50 Normal.jpg", seq = 1),
+            PhotoEntry("00-3 Nameplate.jpg", seq = 0))
         val g = PhotoGroups.build(rows, listOf(photo("p1", row = "a"), photo("p2", tag = "Overview")), server)
         assertEquals("01-3 Terminal box - 50 Normal.jpg", g.first { it.rowLocalId == "a" }.items.last().name)
         assertEquals("00-4 Overview.jpg", g.first { it.isRma }.items.last().name)
@@ -79,10 +79,10 @@ class PhotosTest {
             FindingRow("new-1", partCode = part, issueCode = Code(null, "34", "Scored")),
         )
         val server = listOf(
-            ServerPhoto("00-1 As received.jpg", seq = 0),
-            ServerPhoto("01-1 Terminal box - 50 Normal.jpg", seq = 1, rowId = "L1"),
-            ServerPhoto("02-1 Piston assy - 34 Scored.jpg", seq = 2, partCode = part),
-            ServerPhoto("09-1 Mystery.jpg", seq = 9, partCode = Code(null, "99", "Gone")),
+            PhotoEntry("00-1 As received.jpg", seq = 0),
+            PhotoEntry("01-1 Terminal box - 50 Normal.jpg", seq = 1, rowId = "L1"),
+            PhotoEntry("02-1 Piston assy - 34 Scored.jpg", seq = 2, partCode = part.key),
+            PhotoEntry("09-1 Mystery.jpg", seq = 9, partCode = CodeKey(null, "99")),
         )
         val local = listOf(photo("p1", row = "new-1"), photo("p2", row = "removed"), photo("sent", row = "new-1", sent = true))
         val g = PhotoGroups.build(rows, local, server)

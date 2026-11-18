@@ -54,6 +54,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,6 +113,8 @@ data class WorkspaceCallbacks(
     val onCloseCamera: () -> Unit = {},
     val onReloadPhotos: () -> Unit = {},
     val onDismissPhotoMessage: () -> Unit = {},
+    /** Report tab actions (C1). */
+    val report: ReportCallbacks = ReportCallbacks(),
 )
 
 /** Width from which the tabs show list and detail side by side (11" tablet landscape ≈ 1280 dp). */
@@ -119,11 +122,37 @@ val TWO_PANE_MIN_WIDTH = 840.dp
 
 /** Inspection workspace (spec §4): persistent header, banners, Findings / Photos / Report tabs. */
 @Composable
-fun WorkspaceScreen(onBack: () -> Unit, vm: WorkspaceViewModel = viewModel()) {
-    val state by vm.state.collectAsStateWithLifecycle()
+fun WorkspaceScreen(onBack: () -> Unit, vm: WorkspaceViewModel = viewModel(), reportVm: ReportViewModel = viewModel()) {
+    val base by vm.state.collectAsStateWithLifecycle()
+    val report by reportVm.state.collectAsStateWithLifecycle()
+    val rma = base.rma
+    LaunchedEffect(rma) { if (rma != null) reportVm.setRma(rma) }
+    val state = base.copy(report = report)
     WorkspaceContent(
         state,
         WorkspaceCallbacks(
+            report = ReportCallbacks(
+                onToggleShowAll = reportVm::toggleShowAll,
+                onEnlarge = reportVm::enlarge,
+                onTogglePick = reportVm::togglePick,
+                onDefect = reportVm::setDefect,
+                onSummary = reportVm::setSummary,
+                onInsertTemplate = reportVm::insertTemplate,
+                onInspectedBy = reportVm::setInspectedBy,
+                onSummaryBy = reportVm::setSummaryBy,
+                onArrange = reportVm::openArrange,
+                onCaption = reportVm::setCaption,
+                onRemovePick = reportVm::removePick,
+                onSortByCaption = reportVm::sortByCaption,
+                onSavePicks = reportVm::savePicks,
+                onConflictUseServer = reportVm::conflictUseServer,
+                onConflictKeepMine = reportVm::conflictKeepMine,
+                onConflictDismiss = reportVm::conflictDismiss,
+                onTogglePartsExpanded = reportVm::togglePartsExpanded,
+                onDismissMessage = reportVm::dismissMessage,
+                onRetryPhotos = reportVm::loadPhotos,
+                loadImage = reportVm::loadImage,
+            ),
             onBack = onBack,
             onRefresh = vm::load,
             onSelectTab = vm::selectTab,
@@ -367,12 +396,17 @@ private fun WorkspaceTabs(selected: WorkspaceTab, onSelect: (WorkspaceTab) -> Un
 @Composable
 private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb: WorkspaceCallbacks) {
     val tab = state.tab
+    if (tab == WorkspaceTab.REPORT) {
+        // The Report tab lays itself out (spec §7: keyboard collapse, portrait collapsible section).
+        ReportTab(state.findingRows, state.selection, state.report, state.readOnly, twoPane, cb.report, cb.onSelect)
+        return
+    }
     val list: @Composable (Modifier) -> Unit = { m ->
         Box(m.testTag(WorkspaceTags.listPane(tab))) {
             when (tab) {
                 WorkspaceTab.FINDINGS -> FindingsList(state, cb)
                 WorkspaceTab.PHOTOS -> PhotosList(state, cb)
-                WorkspaceTab.REPORT -> ReportList(rma, state.selection, cb.onSelect)
+                WorkspaceTab.REPORT -> Unit
             }
         }
     }
@@ -381,7 +415,7 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
             when (tab) {
                 WorkspaceTab.FINDINGS -> FindingSheet(state, cb)
                 WorkspaceTab.PHOTOS -> PhotosDetail(state, cb)
-                WorkspaceTab.REPORT -> ReportDetail(rma)
+                WorkspaceTab.REPORT -> Unit
             }
         }
     }
@@ -403,35 +437,6 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
             HorizontalDivider(color = BitzerColors.Grey30)
             detail(Modifier.weight(1f).fillMaxWidth())
         }
-    }
-}
-
-// --- Report (placeholder until C1)
-
-@Composable
-private fun ReportList(rma: RmaDetail, selection: String?, onSelect: (String?) -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        PaneTitle("Parts for the report", "${rma.parts.size}")
-        LazyColumn(Modifier.weight(1f)) {
-            if (rma.parts.isEmpty()) item { EmptyText("No parts recorded yet.") }
-            itemsIndexed(rma.parts, key = { _, r -> r.rowId }) { i, row ->
-                PartListRow(i, row, selected = row.rowId == selection) { onSelect(row.rowId) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReportDetail(rma: RmaDetail) {
-    val s = rma.summary
-    DetailColumn {
-        PaneTitle("Report", "Read only for now — the report editor comes in milestone C")
-        DetailField("General defect code", s.defectCode.text().ifBlank { "Not set" })
-        s.blocks.forEach { b ->
-            DetailField(if (s.blocks.size == 1) "Report summary" else "Summary ${b.blockId}", b.text.ifBlank { "Empty" })
-        }
-        DetailField("Inspected by", s.inspectedBy)
-        DetailField("Summary by", s.summaryBy)
     }
 }
 

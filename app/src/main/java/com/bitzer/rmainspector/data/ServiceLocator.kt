@@ -51,6 +51,14 @@ object ServiceLocator {
             photoStore ?: PhotoStore(File(context.applicationContext.filesDir, "photos")).also { photoStore = it }
         }
 
+    @Volatile private var reportDraftStore: ReportDraftStore? = null
+
+    /** Report tab drafts (defect code, summary, by-fields, report-photo picks) per RMA. */
+    fun reportDrafts(context: Context): ReportDraftStore =
+        reportDraftStore ?: synchronized(this) {
+            reportDraftStore ?: ReportDraftStore(File(context.applicationContext.filesDir, "report_drafts/report_drafts.json")).also { reportDraftStore = it }
+        }
+
     fun settings(context: Context): SettingsStore =
         store ?: synchronized(this) {
             store ?: SettingsStore(context.applicationContext, BuildConfig.DEFAULT_SERVER_URL).also { store = it }

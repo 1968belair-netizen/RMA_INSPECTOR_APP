@@ -7,7 +7,7 @@ import com.bitzer.rmainspector.data.PhotoGroup
 import com.bitzer.rmainspector.data.PhotoGroups
 import com.bitzer.rmainspector.data.PhotoItem
 import com.bitzer.rmainspector.data.PhotoSource
-import com.bitzer.rmainspector.data.ServerPhoto
+import com.bitzer.rmainspector.data.PhotoEntry
 
 /** What the camera is taking a photo for. */
 sealed interface CaptureTarget {
@@ -30,7 +30,7 @@ data class TagPickerState(val tag: String? = null, val tagText: String = "")
  */
 data class PhotosState(
     val local: List<LocalPhoto> = emptyList(),
-    val server: List<ServerPhoto> = emptyList(),
+    val server: List<PhotoEntry> = emptyList(),
     val serverLoaded: Boolean = false,
     val serverError: String? = null,
     val capture: CaptureTarget? = null,

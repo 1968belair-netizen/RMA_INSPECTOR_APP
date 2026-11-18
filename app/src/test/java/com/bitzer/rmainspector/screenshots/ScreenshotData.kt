@@ -10,7 +10,7 @@ import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.toFindingRows
 import com.bitzer.rmainspector.data.Flag
 import com.bitzer.rmainspector.data.LocalPhoto
-import com.bitzer.rmainspector.data.ServerPhoto
+import com.bitzer.rmainspector.data.PhotoEntry
 import com.bitzer.rmainspector.ui.workspace.PhotosState
 import com.bitzer.rmainspector.ui.workspace.TagPickerState
 import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
@@ -33,7 +33,15 @@ import com.bitzer.rmainspector.ui.home.SearchState
 import com.bitzer.rmainspector.ui.home.WorkListState
 import com.bitzer.rmainspector.ui.signin.SignInState
 import com.bitzer.rmainspector.ui.workspace.FindingsState
+import com.bitzer.rmainspector.data.ReportDraft
+import com.bitzer.rmainspector.data.ReportPick
 import com.bitzer.rmainspector.ui.workspace.GuidedButton
+import com.bitzer.rmainspector.ui.workspace.ReportLists
+import com.bitzer.rmainspector.ui.workspace.ReportMessage
+import com.bitzer.rmainspector.ui.workspace.ReportPhotosLoad
+import com.bitzer.rmainspector.ui.workspace.ReportPicsConflict
+import com.bitzer.rmainspector.ui.workspace.ReportState
+import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
 import com.bitzer.rmainspector.ui.workspace.WorkspaceLoad
 import com.bitzer.rmainspector.ui.workspace.WorkspaceState
 
@@ -170,9 +178,9 @@ object ScreenshotData {
         photoId = id, kind = if (row != null) LocalPhoto.KIND_PART else LocalPhoto.KIND_RMA, rowLocalId = row, tag = tag, tagText = text,
         capturedAt = "2026-11-17T10:49:02-05:00", file = "$id.jpg")
     private val photosServer = listOf(
-        ServerPhoto("00-1 As received.jpg", seq = 0),
-        ServerPhoto("00-2 Nameplate.jpg", seq = 0),
-        ServerPhoto("01-1 Terminal box - 50 Normal.jpg", seq = 1, rowId = "L1.sig-1"),
+        PhotoEntry("00-1 As received.jpg", seq = 0),
+        PhotoEntry("00-2 Nameplate.jpg", seq = 0),
+        PhotoEntry("01-1 Terminal box - 50 Normal.jpg", seq = 1, rowId = "L1.sig-1"),
     )
     private val photosLocal = listOf(lp("a1", tag = "Overview"), lp("a2", row = "new-1"), lp("a3", row = "new-1"), lp("a4", row = "L2.x"))
     private val photosState = PhotosState(local = photosLocal, server = photosServer, serverLoaded = true)
@@ -203,4 +211,43 @@ object ScreenshotData {
         items = homeDefault.workList.items + item("912347", "4PE-15Y", "Recip", "recip", "Core&Inspection", "2026-11-02", serial = "25X0000003"),
         draftChanged = setOf("912347"),
     ))
+    // --- Report tab (C1). FAKE photos / picks for RMA 912345.
+    private val photos = listOf(
+        PhotoEntry("00-1 As received.jpg", 512000, 0), PhotoEntry("00-2 Nameplate.jpg", 498000, 0),
+        PhotoEntry("01-1 Terminal box - 50 Normal.jpg", 601000, 1, CodeKey(null, "07a"), "L1.x"),
+        PhotoEntry("02-1 Winding resistance - 50 Normal.jpg", 590000, 2, CodeKey(null, "48a"), "L2.x"),
+        PhotoEntry("02-2 Winding resistance - 50 Normal.jpg", 588000, 2, CodeKey(null, "48a"), "L2.x"),
+    )
+    private val reportLists = ReportLists(
+        defectCodes = listOf(c("07", "Electrical failure"), c("10", "Lack of lubrication"), c("14", "Liquid slugging")),
+        recentDefect = listOf(CodeKey(null, "10")),
+        summaryTemplate = "The primary failure mode is the [ ] of the [ ] likely due to [ ]. Failure progression resulted in [ ].",
+    )
+    private val reportDraft = ReportDraft(
+        rmaId = "912345", defectCode = c("10", "Lack of lubrication"),
+        summaries = mapOf("1" to "The primary failure mode is the scoring of the cylinder wall likely due to lack of lubrication. " +
+            "Failure progression resulted in a seized piston. No defects in materials or workmanship were found with this compressor."),
+        inspectedBy = "DI", summaryBy = "DI",
+        picks = listOf(
+            ReportPick("all_pics", "00-1 As received.jpg", "00-1 As received"),
+            ReportPick("all_pics", "02-1 Winding resistance - 50 Normal.jpg", "02-1 Winding resistance, cylinder 2"),
+            ReportPick("report_pics", "05 Desk photo.jpg", "05 Desk photo"),
+        ),
+        savedPicks = listOf(ReportPick("report_pics", "05 Desk photo.jpg", "05 Desk photo")),
+        picksBaseSignature = "rp-example",
+    )
+    private val report = ReportState(draft = reportDraft, photosLoad = ReportPhotosLoad.Loaded, photos = photos, lists = reportLists,
+        keyboardOpen = false)
+    private val reportRma = rma.copy(photos = PhotoFolder(folderFound = true, folderDisplay = "912xxx\\9123xx\\912345\\All Pics",
+        count = photos.size, files = photos.map { it.filename }))
+    private fun wsReport(r: ReportState, selection: String? = null) = ws(reportRma).copy(tab = WorkspaceTab.REPORT, selection = selection, report = r)
+
+    val workspaceReport = wsReport(report)
+    val workspaceReportPart = wsReport(report, selection = "L2.x")
+    val workspaceReportKeyboard = wsReport(report.copy(keyboardOpen = true), selection = "L2.x")
+    val workspaceReportArrange = wsReport(report.copy(arrange = true,
+        message = ReportMessage("Fix the captions marked in red before saving.", error = true),
+        draft = reportDraft.copy(picks = reportDraft.picks + ReportPick("all_pics", "02-2 Winding resistance - 50 Normal.jpg", "00-1 As received"))))
+    val reportConflict = ReportPicsConflict(
+        listOf("00-1 As received.jpg", "05 Desk photo.jpg", "06 Another desk photo.jpg"), "rp-newer")
 }

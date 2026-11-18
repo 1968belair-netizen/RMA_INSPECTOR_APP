@@ -33,7 +33,7 @@ class AndroidPhotoThumbs(
         val bmp = withContext(Dispatchers.IO) {
             when (source) {
                 is PhotoSource.Local -> fileOf(source)?.takeIf { it.exists() }?.let { decodeFile(it, if (full) 1600 else 480) }
-                is PhotoSource.Server -> when (val r = api.photoBytes(baseUrl(), rmaId, source.filename, thumb = !full)) {
+                is PhotoSource.Server -> when (val r = api.photoBytes(baseUrl(), rmaId, "all", source.filename, thumb = !full)) {
                     is ApiResult.Ok -> decodeBytes(r.value, if (full) 1600 else 480)
                     is ApiResult.Failure -> null
                 }

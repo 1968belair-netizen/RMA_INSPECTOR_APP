@@ -123,6 +123,8 @@ data class CodeLists(
     val limits: Map<String, Int> = emptyMap(),
     /** Guided inspection lists keyed by `product_type_key` (api §4). Empty in v1. */
     val checklists: Map<String, Checklist> = emptyMap(),
+    /** Report settings (api §4): pages per photo page, fixed pages. */
+    val report: ReportSettings = ReportSettings(),
 ) {
     /** The cause picker is shown only when the server sends causes (none for Macola). */
     val causesEnabled: Boolean get() = causes.isNotEmpty()
@@ -248,23 +250,4 @@ data class RmaDetail(
     val parts: List<PartRow> = emptyList(),
     val summary: Summary = Summary(),
     val photos: PhotoFolder = PhotoFolder(),
-)
-
-/** One file of `GET /rmas/{id}/photos` → `all_pics` (api §8). `seq`/`partCode`/`rowId` link it to a part (nullable). */
-@Serializable
-data class ServerPhoto(
-    val filename: String,
-    val bytes: Long = 0,
-    val modified: String = "",
-    val seq: Int? = null,
-    @SerialName("part_code") val partCode: Code? = null,
-    @SerialName("row_id") val rowId: String? = null,
-)
-
-/** `GET /rmas/{id}/photos` (api §8). Report pics are handled by the Report tab (milestone C). */
-@Serializable
-data class PhotoListResponse(
-    @SerialName("folder_found") val folderFound: Boolean = false,
-    @SerialName("folder_display") val folderDisplay: String = "",
-    @SerialName("all_pics") val allPics: List<ServerPhoto> = emptyList(),
 )

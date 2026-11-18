@@ -162,7 +162,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     }
 
     private suspend fun fetchServerPhotos(rmaId: String) {
-        when (val r = api.listPhotos(store.settings.first().serverUrl, rmaId)) {
+        when (val r = api.photoListing(store.settings.first().serverUrl, rmaId)) {
             is ApiResult.Ok -> {
                 thumbs.clear()
                 _state.update { it.copy(photos = it.photos.copy(server = r.value.allPics, serverLoaded = true, serverError = null)) }

@@ -202,7 +202,7 @@ data class PhotoItem(
     val isPreview: Boolean,
     val nameHint: String? = null,
     val local: LocalPhoto? = null,
-    val server: ServerPhoto? = null,
+    val server: PhotoEntry? = null,
 ) {
     /** Only photos taken on this tablet and not yet sent can be retaken or deleted here. */
     val canEdit: Boolean get() = local != null
@@ -239,27 +239,27 @@ object PhotoGroups {
     }
 
     /** Highest photo number the server already uses for `<seq>-n …` (0 = none). The server's next name is max + 1. */
-    internal fun maxServerNumber(server: List<ServerPhoto>, seq: Int): Int =
+    internal fun maxServerNumber(server: List<PhotoEntry>, seq: Int): Int =
         server.mapNotNull { numbered.find(it.filename) }
             .filter { it.groupValues[1].toIntOrNull() == seq }
             .maxOfOrNull { it.groupValues[2].toIntOrNull() ?: 0 } ?: 0
 
     /** Which row a server photo belongs to (api §8): `row_id`, else part code + position, else part code alone. */
-    internal fun rowIndexFor(photo: ServerPhoto, rows: List<FindingRow>): Int? {
+    internal fun rowIndexFor(photo: PhotoEntry, rows: List<FindingRow>): Int? {
         photo.rowId?.let { id -> rows.indexOfFirst { it.rowId == id }.takeIf { it >= 0 }?.let { return it } }
         val part = photo.partCode ?: return null
-        val matches = rows.withIndex().filter { it.value.partCode?.key == part.key }
+        val matches = rows.withIndex().filter { it.value.partCode?.key == part }
         if (matches.isEmpty()) return null
         return (matches.firstOrNull { photo.seq != null && it.index + 1 == photo.seq } ?: matches.first()).index
     }
 
-    fun build(rows: List<FindingRow>, local: List<LocalPhoto>, server: List<ServerPhoto>): List<PhotoGroup> {
+    fun build(rows: List<FindingRow>, local: List<LocalPhoto>, server: List<PhotoEntry>): List<PhotoGroup> {
         val unsent = local.filter { !it.isSent }
         val rowIds = rows.mapTo(HashSet()) { it.localId }
 
-        val serverByRow = HashMap<Int, MutableList<ServerPhoto>>()
-        val serverRma = mutableListOf<ServerPhoto>()
-        val serverUnlinked = mutableListOf<ServerPhoto>()
+        val serverByRow = HashMap<Int, MutableList<PhotoEntry>>()
+        val serverRma = mutableListOf<PhotoEntry>()
+        val serverUnlinked = mutableListOf<PhotoEntry>()
         for (p in server) {
             val idx = rowIndexFor(p, rows)
             when {
@@ -269,7 +269,7 @@ object PhotoGroups {
             }
         }
 
-        fun serverItem(p: ServerPhoto) = PhotoItem(SERVER_PREFIX + p.filename, PhotoSource.Server(p.filename), p.filename, isPreview = false, server = p)
+        fun serverItem(p: PhotoEntry) = PhotoItem(SERVER_PREFIX + p.filename, PhotoSource.Server(p.filename), p.filename, isPreview = false, server = p)
 
         val groups = mutableListOf<PhotoGroup>()
 
@@ -310,11 +310,11 @@ object PhotoGroups {
         PhotoItem(p.photoId, PhotoSource.Local(p.photoId, p.file), name, isPreview = true, nameHint = hint, local = p)
 
     /** Photos per row ([FindingRow.localId]) for the "📷 n" badge of the Findings list. */
-    fun countsByRow(rows: List<FindingRow>, local: List<LocalPhoto>, server: List<ServerPhoto>): Map<String, Int> =
+    fun countsByRow(rows: List<FindingRow>, local: List<LocalPhoto>, server: List<PhotoEntry>): Map<String, Int> =
         build(rows, local, server).filter { it.rowLocalId != null && it.items.isNotEmpty() }.associate { it.rowLocalId!! to it.items.size }
 
     /** Preview name for a not-yet-taken RMA photo with [tag] (tag picker). */
-    fun rmaPreview(local: List<LocalPhoto>, server: List<ServerPhoto>, tag: String, tagText: String?): String =
+    fun rmaPreview(local: List<LocalPhoto>, server: List<PhotoEntry>, tag: String, tagText: String?): String =
         PhotoNaming.rmaPhoto(maxServerNumber(server, 0) + local.count { !it.isSent && it.isRma } + 1, tag, tagText)
 }
 
