@@ -15,6 +15,7 @@ import com.bitzer.rmainspector.data.RmaListItem
 import com.bitzer.rmainspector.data.Summary
 import com.bitzer.rmainspector.data.SummaryBlock
 import com.bitzer.rmainspector.data.User
+import com.bitzer.rmainspector.data.WorkListFilter
 import com.bitzer.rmainspector.ui.AppUiState
 import com.bitzer.rmainspector.ui.Connection
 import com.bitzer.rmainspector.ui.SignInProgress
@@ -57,13 +58,26 @@ object ScreenshotData {
         item("912355", "CSH6553-50Y", "Screw", "screw", "Repair & Return", "2026-11-06", flags = listOf(core), serial = "25X0000010"),
         item("912357", "2KES-05Y", "Recip", "recip", "Inspection Only", "2026-11-13", serial = "25X0000012"),
     )
-    val statuses = listOf("Open", "Entered", "En Route", "Received", "Inspected", "Rework in Progress", "Report Complete",
-        "Sent to RSM", "Issued to Customer", "Non-Warranty Processed", "Closed").map { c(it) }
+    /** Fixed "today" so ages in screenshots never change. */
+    val today: java.time.LocalDate = java.time.LocalDate.of(2026, 11, 18)
 
-    val homeDefault = HomeState(workList = WorkListState(statuses = statuses, selected = listOf(CodeKey(null, "Received")),
-        items = workItems, loadedOnce = true))
-    val homeEmpty = homeDefault.copy(workList = homeDefault.workList.copy(items = emptyList()))
-    val homeError = HomeState(workList = WorkListState(error = "Can't reach the server. Check the address in Settings."))
+    val workProductTypes = listOf("Recip", "Screw", "Scroll", "Part", "Transport", "Pressure Vessel", "System/Unit").map { c(it) }
+    val workReturnCodes = listOf("Core Buyback", "Core Credit", "Core&Inspection", "Cus Line Reject", "Freight Damage",
+        "Inspection Only", "New & Unused", "Repair & Return", "Warranty").map { c(it) }
+    val defaultFilter = WorkListFilter(listOf("Recip", "Screw", "Scroll", "Part"),
+        listOf("Inspection Only", "Repair & Return", "Warranty").map { CodeKey(null, it) })
+
+    val homeDefault = HomeState(workList = WorkListState(productTypes = workProductTypes, returnCodes = workReturnCodes,
+        filter = defaultFilter, items = workItems, loadedOnce = true))
+    /** Screw only, Warranty + Repair & Return. */
+    val homeFiltered = homeDefault.copy(workList = homeDefault.workList.copy(
+        filter = WorkListFilter(listOf("Screw"), listOf(CodeKey(null, "Repair & Return"), CodeKey(null, "Warranty"))),
+        items = workItems.filter { it.productType == "Screw" }))
+    val homeEmpty = homeDefault.copy(workList = homeDefault.workList.copy(
+        filter = WorkListFilter(listOf("Transport"), listOf(CodeKey(null, "Freight Damage"))), items = emptyList()))
+    val homeError = homeDefault.copy(workList = homeDefault.workList.copy(items = emptyList(), loadedOnce = false,
+        error = "The server didn't answer in time. Pull down or tap Retry."))
+    val homeOffline = HomeState(workList = WorkListState(error = "Can't reach the server. Check the address in Settings."))
     val homeSearch = homeDefault.copy(search = SearchState.Results("25X", "serial", workItems.take(2)))
 
     val rma = RmaDetail(

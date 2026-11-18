@@ -38,7 +38,7 @@ class LookupApiTest {
     }
 
     @Test
-    fun workListSendsStatusCodesWithGroups() = runBlocking {
+    fun workListSendsChipSelectionWithGroups() = runBlocking {
         server.enqueue(MockResponse().setBody(
             """{"results":[{"rma_id":"912345","display_number":"912345","model":"4FE-28Y",
                "return_code":{"group":null,"code":"Warranty","description":"Warranty"},
@@ -46,7 +46,7 @@ class LookupApiTest {
                "status_since":"2026-10-26","status_since_estimated":true,
                "flags":[{"code":"CORE_TEARDOWN","label":"In core teardown log"}],
                "is_open":true,"inspectable":true,"locked":false}],"generated_at":"2026-11-17T10:00:00-05:00"}"""))
-        val r = api.workList(base, listOf(CodeKey(null, "Received"), CodeKey("ZRMA", "E0003"))) as ApiResult.Ok
+        val r = api.workList(base, listOf("Recip", "Screw"), listOf(CodeKey(null, "Repair & Return"), CodeKey("ZRMA", "E0003"))) as ApiResult.Ok
         assertEquals("912345", r.value.results.single().rmaId)
         val item = r.value.results.single()
         assertEquals("Warranty", item.returnCode?.code)
@@ -54,15 +54,21 @@ class LookupApiTest {
         assertTrue(item.statusSinceEstimated)
         assertEquals("CORE_TEARDOWN", item.flags.single().code)
         val url = server.takeRequest().requestUrl!!
-        assertEquals("Received,ZRMA:E0003", url.queryParameter("inspection_status"))
-        assertEquals("50", url.queryParameter("limit"))
+        assertEquals("Recip,Screw", url.queryParameter("product_type"))
+        assertEquals("Repair & Return,ZRMA:E0003", url.queryParameter("return_code"))
+        assertNull(url.queryParameter("inspection_status"))
     }
 
     @Test
-    fun emptyStatusListMeansServerDefault() = runBlocking {
+    fun nullChipsMeanServerDefaultEmptyMeansNothing() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"results":[]}"""))
-        api.workList(base, emptyList())
-        assertNull(server.takeRequest().requestUrl!!.queryParameter("inspection_status"))
+        api.workList(base, null, null)
+        val url = server.takeRequest().requestUrl!!
+        assertNull(url.queryParameter("product_type"))
+        assertNull(url.queryParameter("return_code"))
+        server.enqueue(MockResponse().setBody("""{"results":[]}"""))
+        api.workList(base, emptyList(), null)
+        assertEquals("", server.takeRequest().requestUrl!!.queryParameter("product_type"))
     }
 
     @Test
@@ -81,8 +87,8 @@ class LookupApiTest {
     }
 
     @Test
-    fun statusQueryFormat() {
-        assertEquals("Received,Report Complete", StatusQuery.format(listOf(CodeKey(null, "Received"), CodeKey(null, "Report Complete"))))
-        assertEquals("G:C", StatusQuery.format(listOf(CodeKey("G", "C"))))
+    fun codeQueryFormat() {
+        assertEquals("Warranty,Repair & Return", CodeQuery.format(listOf(CodeKey(null, "Warranty"), CodeKey(null, "Repair & Return"))))
+        assertEquals("G:C", CodeQuery.format(listOf(CodeKey("G", "C"))))
     }
 }

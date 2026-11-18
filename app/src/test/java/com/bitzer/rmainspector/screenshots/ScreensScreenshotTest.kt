@@ -48,8 +48,8 @@ abstract class ScreenCatalog(private val device: String) {
     @Composable
     private fun home(state: HomeState, app: com.bitzer.rmainspector.ui.AppUiState = ScreenshotData.appOk) =
         HomeContent(app, state, query = if (state.search is com.bitzer.rmainspector.ui.home.SearchState.Results) "25X" else "",
-            onQueryChange = {}, onSearch = {}, onClearSearch = {}, onToggleStatus = {}, onRefreshWorkList = {},
-            onOpenSettings = {}, onRetryServer = {}, onOpenRma = {})
+            onQueryChange = {}, onSearch = {}, onClearSearch = {}, onToggleProductType = {}, onToggleReturnCode = {},
+            onRefreshWorkList = {}, onOpenSettings = {}, onRetryServer = {}, onOpenRma = {}, today = ScreenshotData.today)
 
     @Composable
     private fun signIn(state: SignInState) =
@@ -62,8 +62,10 @@ abstract class ScreenCatalog(private val device: String) {
 
     @Test fun home_default() = shot("home_default") { home(ScreenshotData.homeDefault) }
     @Test fun home_search_results() = shot("home_search_results") { home(ScreenshotData.homeSearch) }
+    @Test fun home_filtered() = shot("home_filtered") { home(ScreenshotData.homeFiltered) }
     @Test fun home_empty() = shot("home_empty") { home(ScreenshotData.homeEmpty) }
-    @Test fun home_offline() = shot("home_offline") { home(ScreenshotData.homeError, ScreenshotData.appOffline) }
+    @Test fun home_error() = shot("home_error") { home(ScreenshotData.homeError) }
+    @Test fun home_offline() = shot("home_offline") { home(ScreenshotData.homeOffline, ScreenshotData.appOffline) }
 
     @Test fun rma_overview() = shot("rma_overview") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rma), {}, {}) }
     @Test fun rma_locked() = shot("rma_locked") { RmaOverviewContent(OverviewState.Loaded(ScreenshotData.rmaLocked), {}, {}) }

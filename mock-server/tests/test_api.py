@@ -300,3 +300,13 @@ def test_no_token_bypass_and_no_inspectors_endpoint(anon, monkeypatch):
     r = anon.get("/api/v1/codelists", headers={"X-Inspector": "demo"})
     assert r.status_code == 401 and r.json()["error"]["code"] == "UNAUTHENTICATED"
     assert anon.post("/api/v1/auth/login", json={"username": "demo", "password": "demo"}).status_code == 200
+
+
+def test_work_list_explicit_default_chips_match_server_default(client):
+    """The app sends the chips it shows; the defaults sent explicitly give the default list (issue #17)."""
+    params = {"product_type": "Recip,Scroll,Screw,Part", "return_code": "Inspection Only,Repair & Return,Warranty"}
+    rows = client.get("/api/v1/rmas", params=params).json()["results"]
+    assert [r["rma_id"] for r in rows] == ["912346", "912348", "912345", "912352", "912355", "912357"]
+    params["product_type"] = "Recip,Screw,Part"
+    rows = client.get("/api/v1/rmas", params=params).json()["results"]
+    assert [r["rma_id"] for r in rows] == ["912346", "912345", "912352", "912355", "912357"]

@@ -5,13 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.Code
-import com.bitzer.rmainspector.data.CodeKey
+import com.bitzer.rmainspector.data.CodeLists
 import com.bitzer.rmainspector.data.RmaListItem
 import com.bitzer.rmainspector.data.ServiceLocator
+import com.bitzer.rmainspector.data.WorkListFilter
+import com.bitzer.rmainspector.data.WorkListRules
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -27,15 +30,22 @@ sealed interface SearchState {
 }
 
 data class WorkListState(
-    /** Every inspection status the server offers, in server order (filter chips). */
-    val statuses: List<Code> = emptyList(),
-    /** Selected statuses; empty until the server's default or the saved choice is known. */
-    val selected: List<CodeKey> = emptyList(),
+    /** Product-type chips (server order) — empty until the code lists are on the device. */
+    val productTypes: List<Code> = emptyList(),
+    /** Return-code chips (natural sort order). */
+    val returnCodes: List<Code> = emptyList(),
+    /** Selected chips; null = not known yet (the server's defaults are used). */
+    val filter: WorkListFilter? = null,
     val items: List<RmaListItem> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
     val loadedOnce: Boolean = false,
-)
+) {
+    /** A chip row with nothing selected matches nothing (api §5) — no need to ask the server. */
+    val nothingSelected: Boolean
+        get() = filter != null &&
+            ((productTypes.isNotEmpty() && filter.productTypes.isEmpty()) || (returnCodes.isNotEmpty() && filter.returnCodes.isEmpty()))
+}
 
 data class HomeState(
     val search: SearchState = SearchState.Idle,
@@ -44,22 +54,72 @@ data class HomeState(
     val openRmaId: String? = null,
 )
 
-/** Home (spec §3.2–3.3): free-text search and the status-filtered work list. */
+/** Home (spec §3): one search box and the Received work list with product-type / return-code chips. */
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val store = ServiceLocator.settings(app)
     private val api = ServiceLocator.api
+    private val codeLists = ServiceLocator.codeLists(app)
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
     private var workJob: Job? = null
 
+    /** What the last successful/attempted load asked for, so an unchanged 304 code-list refresh doesn't reload. */
+    private var requested: Pair<String, WorkListFilter?>? = null
+
     init {
-        // Reload everything when the server address changes (and once at start).
         viewModelScope.launch {
-            store.settings.map { it.serverUrl }.distinctUntilChanged().collect { loadStatusesAndWorkList() }
+            val urls = store.settings.map { it.serverUrl }.distinctUntilChanged()
+            urls.collect { url -> codeLists.loadCached(url) }
+        }
+        viewModelScope.launch {
+            combine(
+                store.settings.map { it.serverUrl }.distinctUntilChanged(),
+                codeLists.state.map { it.lists }.distinctUntilChanged(),
+            ) { url, lists -> url to lists }.collect { (url, lists) -> reconcile(url, lists) }
         }
     }
 
     private suspend fun baseUrl() = store.settings.first().serverUrl
+
+    /** Chips + selection from the code lists (saved choice, else server default); reload if the filter changed. */
+    private suspend fun reconcile(url: String, lists: CodeLists?) {
+        val saved = store.workListFilter.first()
+        if (lists != null) {
+            val chips = WorkListRules.resolve(lists, saved)
+            _state.update {
+                it.copy(workList = it.workList.copy(productTypes = chips.productTypes, returnCodes = chips.returnCodes, filter = chips.filter))
+            }
+        } else {
+            // No code lists on the device yet: use the saved choice if any, else let the server apply its defaults.
+            _state.update { it.copy(workList = it.workList.copy(filter = saved)) }
+        }
+        val want = url to _state.value.workList.filter
+        if (want != requested) load()
+    }
+
+    private fun load() {
+        workJob?.cancel()
+        workJob = viewModelScope.launch {
+            val url = baseUrl()
+            val ws = _state.value.workList
+            requested = url to ws.filter
+            if (ws.nothingSelected) {
+                _state.update { it.copy(workList = it.workList.copy(items = emptyList(), loading = false, error = null, loadedOnce = true)) }
+                return@launch
+            }
+            _state.update { it.copy(workList = it.workList.copy(loading = true, error = null)) }
+            // Only send a chip row the device actually shows; otherwise the server default applies.
+            val f = ws.filter
+            val pt = if (f == null || (ws.productTypes.isEmpty() && f.productTypes.isEmpty())) null else f.productTypes
+            val rc = if (f == null || (ws.returnCodes.isEmpty() && f.returnCodes.isEmpty())) null else f.returnCodes
+            when (val r = api.workList(url, pt, rc)) {
+                is ApiResult.Failure -> _state.update { it.copy(workList = it.workList.copy(loading = false, error = r.message)) }
+                is ApiResult.Ok -> _state.update {
+                    it.copy(workList = it.workList.copy(items = WorkListRules.sort(r.value.results), loading = false, error = null, loadedOnce = true))
+                }
+            }
+        }
+    }
 
     fun search(text: String) {
         val q = text.trim()
@@ -85,57 +145,18 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onRmaOpened() = _state.update { it.copy(openRmaId = null) }
 
-    private suspend fun loadStatusesAndWorkList() {
-        if (loadStatuses()) loadWorkList()
-    }
+    fun toggleProductType(chip: Code) = setFilter { f, ws -> WorkListRules.toggleProductType(f, ws.productTypes, chip.code) }
 
-    /** Status chips + selection (saved choice, else the server default). False if the server can't be reached. */
-    private suspend fun loadStatuses(): Boolean {
-        _state.update { it.copy(workList = it.workList.copy(loading = true, error = null)) }
-        return when (val cl = api.codeLists(baseUrl())) {
-            is ApiResult.Failure -> {
-                _state.update { it.copy(workList = it.workList.copy(loading = false, error = cl.message)) }
-                false
-            }
-            is ApiResult.Ok -> {
-                val all = cl.value.inspectionStatuses
-                val allKeys = all.map { it.key }.toSet()
-                val saved = store.workListFilter.first()?.filter { it in allKeys }
-                val selected = if (saved.isNullOrEmpty()) cl.value.workListStatuses.filter { it in allKeys } else saved
-                _state.update { it.copy(workList = it.workList.copy(statuses = all, selected = selected)) }
-                true
-            }
-        }
-    }
+    fun toggleReturnCode(chip: Code) = setFilter { f, ws -> WorkListRules.toggleReturnCode(f, ws.returnCodes, chip.key) }
 
-    private suspend fun loadWorkList() {
-        val selected = _state.value.workList.selected
-        if (selected.isEmpty()) {
-            _state.update { it.copy(workList = it.workList.copy(items = emptyList(), loading = false, error = null, loadedOnce = true)) }
-            return
-        }
-        _state.update { it.copy(workList = it.workList.copy(loading = true, error = null)) }
-        when (val r = api.workList(baseUrl(), selected)) {
-            is ApiResult.Failure -> _state.update { it.copy(workList = it.workList.copy(loading = false, error = r.message)) }
-            is ApiResult.Ok -> _state.update {
-                it.copy(workList = it.workList.copy(items = r.value.results, loading = false, error = null, loadedOnce = true))
-            }
-        }
-    }
-
-    fun toggleStatus(key: CodeKey) {
-        val current = _state.value.workList.selected
-        val next = if (key in current) current - key else current + key
-        _state.update { it.copy(workList = it.workList.copy(selected = next)) }
+    private fun setFilter(change: (WorkListFilter, WorkListState) -> WorkListFilter) {
+        val ws = _state.value.workList
+        val next = change(ws.filter ?: WorkListFilter(), ws)
+        _state.update { it.copy(workList = it.workList.copy(filter = next)) }
         viewModelScope.launch { store.setWorkListFilter(next) }
-        refreshWorkList()
+        load()
     }
 
-    /** Pull-to-refresh / Retry. Reloads the status list too if it never loaded. */
-    fun refreshWorkList() {
-        workJob?.cancel()
-        workJob = viewModelScope.launch {
-            if (_state.value.workList.statuses.isEmpty()) loadStatusesAndWorkList() else loadWorkList()
-        }
-    }
+    /** Pull to refresh / Retry. */
+    fun refreshWorkList() = load()
 }

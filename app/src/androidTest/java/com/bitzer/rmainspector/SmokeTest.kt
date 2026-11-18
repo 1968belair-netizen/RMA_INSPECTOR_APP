@@ -2,16 +2,21 @@ package com.bitzer.rmainspector
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,7 +24,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.bitzer.rmainspector.data.ServiceLocator
 import java.net.HttpURLConnection
 import java.net.URL
+import com.bitzer.rmainspector.ui.home.HomeTags
 import com.bitzer.rmainspector.ui.signin.SignInTags
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.rules.ExternalResource
 import org.junit.Test
@@ -36,7 +44,9 @@ class SmokeTest {
     /** Each test starts signed out, whatever order JUnit runs them in (runs before the activity starts). */
     @get:Rule(order = 0) val signedOut = object : ExternalResource() {
         override fun before() {
-            ServiceLocator.auth(InstrumentationRegistry.getInstrumentation().targetContext).clear()
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            ServiceLocator.auth(context).clear()
+            runBlocking { ServiceLocator.settings(context).clearWorkListFilter() } // server-default chips
         }
     }
 
@@ -108,6 +118,46 @@ class SmokeTest {
         signInAsDemo()
         compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
         compose.onNodeWithText("Example Refrigeration Co.").assertExists()
+    }
+
+    /**
+     * Issue #17: the default work list (Received; Recip/Scroll/Screw/Part; Inspection Only/Repair & Return/Warranty)
+     * is oldest first; unticking a chip refilters and is remembered when Home is opened again after sign-out/in.
+     */
+    @Test
+    fun workListDefaultOrderAndRememberedChips() {
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
+        signInAsDemo()
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("6 RMAs"), timeoutMillis = 30_000)
+        assertWorkListOrder(listOf("912346", "912348", "912345", "912352", "912355", "912357"))
+
+        // Untick Scroll → 912348 drops out.
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        compose.onNode(hasText("Scroll") and hasClickAction()).performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("5 RMAs"), timeoutMillis = 15_000)
+
+        // Sign out and in again: a new Home reads the remembered chips from the device.
+        compose.onNode(hasContentDescription("Settings") and hasClickAction()).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("Sign out", substring = true), timeoutMillis = 10_000)
+        compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 10_000)
+        signInAsDemo()
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("5 RMAs"), timeoutMillis = 30_000)
+        assertWorkListOrder(listOf("912346", "912345", "912352", "912355", "912357"))
+    }
+
+    /** Each card appears below the one before it (scrolls the lazy list as needed). */
+    private fun assertWorkListOrder(ids: List<String>) {
+        val list = compose.onNode(hasScrollToNodeAction())
+        ids.zipWithNext().forEach { (a, b) ->
+            list.performScrollToNode(hasTestTag(HomeTags.workItem(a)))
+            list.performScrollToNode(hasTestTag(HomeTags.workItem(b)))
+            compose.waitForIdle()
+            val top = { id: String -> compose.onAllNodesWithTag(HomeTags.workItem(id)).fetchSemanticsNodes().firstOrNull()?.boundsInRoot?.top }
+            val ta = top(a)
+            val tb = top(b)
+            assertTrue("RMA $a should be listed before $b (tops: $ta, $tb)", ta != null && tb != null && ta < tb)
+        }
     }
 
     private fun signInAsDemo() {

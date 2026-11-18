@@ -3,7 +3,6 @@ package com.bitzer.rmainspector.ui.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,17 +14,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,21 +41,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bitzer.rmainspector.data.Code
 import com.bitzer.rmainspector.ui.AppUiState
 import com.bitzer.rmainspector.ui.Connection
 import com.bitzer.rmainspector.ui.components.BitzerTopBar
 import com.bitzer.rmainspector.ui.components.ConnectionBanner
 import com.bitzer.rmainspector.ui.components.InfoBanner
+import com.bitzer.rmainspector.ui.components.MultiSelectChipRow
 import com.bitzer.rmainspector.ui.components.RmaCard
 import com.bitzer.rmainspector.ui.components.ScreenHeader
 import com.bitzer.rmainspector.ui.theme.BitzerColors
+import java.time.LocalDate
 
-/** Home (docs/spec.md §3.2–3.3): server status, free-text search, status-filtered work list. */
+/** Test tags for the emulator tests. */
+object HomeTags {
+    const val SEARCH = "home-search"
+    const val COUNT = "home-work-count"
+    fun workItem(rmaId: String) = "work-item-$rmaId"
+    fun searchItem(rmaId: String) = "search-item-$rmaId"
+}
+
+/** Home (docs/spec.md §3): server status, one search box, Received work list with product-type / return-code chips. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
@@ -82,7 +92,8 @@ fun HomeScreen(
         onQueryChange = { query = it },
         onSearch = { vm.search(query) },
         onClearSearch = { query = ""; vm.clearSearch() },
-        onToggleStatus = vm::toggleStatus,
+        onToggleProductType = vm::toggleProductType,
+        onToggleReturnCode = vm::toggleReturnCode,
         onRefreshWorkList = vm::refreshWorkList,
         onOpenSettings = onOpenSettings,
         onRetryServer = onRetryServer,
@@ -100,11 +111,13 @@ fun HomeContent(
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onClearSearch: () -> Unit,
-    onToggleStatus: (com.bitzer.rmainspector.data.CodeKey) -> Unit,
+    onToggleProductType: (Code) -> Unit,
+    onToggleReturnCode: (Code) -> Unit,
     onRefreshWorkList: () -> Unit,
     onOpenSettings: () -> Unit,
     onRetryServer: () -> Unit,
     onOpenRma: (rmaId: String) -> Unit,
+    today: LocalDate = LocalDate.now(),
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val runSearch = { keyboard?.hide(); onSearch() }
@@ -163,11 +176,17 @@ fun HomeContent(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { runSearch() }),
                             trailingIcon = {
-                                if (query.isNotEmpty()) {
-                                    IconButton(onClick = onClearSearch) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (query.isNotEmpty()) {
+                                        IconButton(onClick = onClearSearch) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
+                                    }
+                                    // Barcode / serial-plate scanning comes in D1 (#19); shown, not usable yet.
+                                    IconButton(onClick = {}, enabled = false) {
+                                        Icon(Icons.Filled.PhotoCamera, contentDescription = "Scan (coming soon)")
+                                    }
                                 }
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).testTag(HomeTags.SEARCH),
                         )
                         Button(onClick = runSearch, enabled = query.isNotBlank(), modifier = Modifier.heightIn(min = 56.dp)) {
                             Icon(Icons.Filled.Search, contentDescription = null)
@@ -201,47 +220,42 @@ fun HomeContent(
                             )
                         }
                         items(s.items, key = { "s-" + it.rmaId }) { item ->
-                            RmaCard(item, onClick = { onOpenRma(item.rmaId) }, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                            RmaCard(item, today, onClick = { onOpenRma(item.rmaId) },
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag(HomeTags.searchItem(item.rmaId)))
                         }
                     }
                 }
 
                 // --- Work list
+                val ws = state.workList
                 item {
                   Column {
-                    ScreenHeader("Work list", subtitle = "Tap the statuses you want to see. Pull down to refresh.")
-                    FlowRow(
-                        Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        state.workList.statuses.forEach { status ->
-                            val selected = status.key in state.workList.selected
-                            FilterChip(
-                                selected = selected,
-                                onClick = { onToggleStatus(status.key) },
-                                label = { Text(status.description.ifBlank { status.code }) },
-                                leadingIcon = if (selected) {
-                                    { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                                } else null,
-                                modifier = Modifier.heightIn(min = 48.dp),
-                            )
+                    ScreenHeader("Work list", subtitle = "RMAs waiting for inspection (Received), oldest first. Pull down to refresh.")
+                    Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val f = ws.filter
+                        if (ws.productTypes.isNotEmpty()) {
+                            MultiSelectChipRow(ws.productTypes, f?.productTypeKeys.orEmpty(), onToggleProductType,
+                                label = "Product type", chipText = { it.code })
+                        }
+                        if (ws.returnCodes.isNotEmpty()) {
+                            MultiSelectChipRow(ws.returnCodes, f?.returnCodeKeys.orEmpty(), onToggleReturnCode,
+                                label = "Return code")
                         }
                     }
                   }
                 }
-                val ws = state.workList
                 when {
                     ws.error != null -> item {
                         InfoBanner(Icons.Filled.ErrorOutline, ws.error, BitzerColors.Error, Modifier.padding(24.dp)) {
-                            TextButton(onClick = { onRefreshWorkList() }) { Text("Retry") }
+                            TextButton(onClick = { onRefreshWorkList() }, modifier = Modifier.heightIn(min = 56.dp)) { Text("Retry") }
                         }
                     }
-                    ws.loadedOnce && ws.selected.isEmpty() -> item {
-                        Text("Pick at least one status to see RMAs.", style = MaterialTheme.typography.bodyLarge,
+                    ws.loadedOnce && ws.nothingSelected -> item {
+                        Text("Pick at least one product type and one return code to see RMAs.", style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(24.dp))
                     }
                     ws.loadedOnce && ws.items.isEmpty() -> item {
-                        Text("No RMAs at the selected statuses.", style = MaterialTheme.typography.bodyLarge,
+                        Text("No Received RMAs match the selected product types and return codes.", style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(24.dp))
                     }
                     else -> {
@@ -249,13 +263,14 @@ fun HomeContent(
                             if (ws.loadedOnce) {
                                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text("${ws.items.size} RMA${if (ws.items.size == 1) "" else "s"}",
-                                        style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                        style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f).testTag(HomeTags.COUNT))
                                     IconButton(onClick = { onRefreshWorkList() }) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
                                 }
                             }
                         }
                         items(ws.items, key = { "w-" + it.rmaId }) { item ->
-                            RmaCard(item, onClick = { onOpenRma(item.rmaId) }, modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                            RmaCard(item, today, onClick = { onOpenRma(item.rmaId) },
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag(HomeTags.workItem(item.rmaId)))
                         }
                     }
                 }
