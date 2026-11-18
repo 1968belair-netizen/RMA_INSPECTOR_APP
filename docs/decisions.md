@@ -3,6 +3,18 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Demo plan: full loop against the mock server (Jacob)
+- **No in-app demo mode.** Jacob demos in person using the mock server (laptop runs `run_mock_server.bat`; laptop and
+  tablet on Jacob's phone hotspot; server address set in Settings). Any in-app demo-mode work is dropped.
+- **Priority:** the full loop against the mock, ready for a manager demo: sign in → find RMA (search + camera) →
+  Findings → Photos → Submit inspection (Inspected) → Report tab → Submit report (spell check) → PDF preview.
+- **Mock work:** realistic demo PDF (disposition letter, RMA report page, 2×3 photo pages; #45); 8 curated fake RMAs
+  incl. one read-only Scroll and one fully completed example, sample guided checklist, demo run script (#46); `docs/demo.md`
+  with setup and a 5-minute tap-by-tap script. Guided inspection (#20) if time allows.
+- **Deferred until after the demo:** offline-queue edge cases, conflict screens, lock handling beyond the banner (#9).
+- **Coordination:** PR #40 (C1) is still owned by the old session; do not touch it until it merges or that session
+  stops, then take it over.
+
 ## 2026-11-18 — Questions 3, 4 and 6 approved as built (Jacob)
 - **Code-list refresh (Q3, #4):** refresh on app start / sign-in (always, ETag → usually `304`) and when the device
   copy is older than **4 h** (checked every 15 min); keep the last **8** used codes per picker, show up to **6**.
