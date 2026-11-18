@@ -7,8 +7,7 @@ The mock behaves like the Macola-era server: codes have group null, row ids are 
 there are no causes and three 4000-character summary blocks. Everything backend-specific stays in here.
 
 Sign-in (rev 7): POST /api/v1/auth/login with a FAKE demo user (demo / demo, or MOCK_USERS env JSON).
-Every other call needs "Authorization: Bearer <token>". Set MOCK_AUTH_OPTIONAL=1 to let app builds made
-before sign-in existed keep working (they send no token; X-Inspector is accepted instead).
+Every other call needs "Authorization: Bearer <token>".
 
 Test hooks (mock only, under /api/v1/_mock): reset, desk-edit (simulate a change elsewhere),
 lock, report-file-in-use.
@@ -49,10 +48,6 @@ def load_users() -> dict:
     return {u.lower(): {"username": u, "display_name": v.get("display_name", u), "initials": v.get("initials", ""),
                         "audit_user_id": u.upper() + "_SQL", "roles": ["all"], "password": v["password"]}
             for u, v in users.items()}
-
-
-def auth_optional() -> bool:
-    return os.environ.get("MOCK_AUTH_OPTIONAL", "") in ("1", "true", "yes")
 
 
 def norm(text: Optional[str]) -> str:
@@ -358,9 +353,6 @@ async def _auth(request: Request, call_next):
         token = header[7:].strip() if header.lower().startswith("bearer ") else ""
         username = store.tokens.get(token) if token else None
         user = store.users.get(username) if username else None
-        if user is None and auth_optional():
-            legacy = (request.headers.get("x-inspector") or "").lower()
-            user = store.users.get(legacy) or next(iter(store.users.values()))
         if user is None:
             return JSONResponse(error_body(ApiError(401, "UNAUTHENTICATED", "Please sign in.")), status_code=401)
         request.state.user = user
@@ -403,12 +395,6 @@ def logout(request: Request):
 def me(request: Request):
     return public_user(signed_in_user(request))
 
-
-@api.get("/inspectors")
-def inspectors_deprecated(request: Request):
-    """Deprecated (rev 7): kept only so app builds from before sign-in still start. Removed with the sign-in issue."""
-    u = public_user(signed_in_user(request))
-    return {"inspectors": [u], "max_inspectors": 10, "sign_in_required": True}
 
 
 def _codelists() -> dict:

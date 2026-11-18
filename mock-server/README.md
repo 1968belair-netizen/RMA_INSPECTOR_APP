@@ -21,8 +21,7 @@ python -m uvicorn mock_server.main:app --host 0.0.0.0 --port 8000
 - `POST /api/v1/auth/login` with `{"username": "demo", "password": "demo"}` → token; send
   `Authorization: Bearer <token>` on every other call. These are **fake** test credentials for the mock only.
   Other users: set `MOCK_USERS` to JSON, e.g. `{"jdoe": {"password": "x", "display_name": "J. Doe", "initials": "JD"}}`.
-- `MOCK_AUTH_OPTIONAL=1` lets app builds from before the sign-in screen keep working (no token needed).
-  `run_mock_server.bat` sets it until the sign-in issue is merged.
+- There is no token-less bypass: the app signs in like it will against the real server.
 
 ## Fake RMAs
 Work list defaults (server settings): status **Received**, product types **Recip / Scroll / Screw / Part**,

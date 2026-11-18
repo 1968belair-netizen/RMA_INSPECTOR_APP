@@ -140,7 +140,7 @@ The token is stored in the app's encrypted storage. `initials` pre-fill Inspecte
 > the server a real user per request; how the server authenticates to SAP per user (principal propagation, OAuth,
 > named technical users) is still open for BITZER IT/SAP (`docs/sap_mapping.md`).
 
-`GET /inspectors` (rev 5–6) is **removed**; the mock keeps it only until the app's sign-in screen ships.
+`GET /inspectors` (rev 5–6) is **removed** (also from the mock, with the sign-in screen).
 
 ---
 
