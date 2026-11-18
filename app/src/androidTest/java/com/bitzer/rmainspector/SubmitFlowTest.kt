@@ -10,6 +10,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -60,11 +62,11 @@ class SubmitFlowTest {
         compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
         compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.ADD_PART) and isEnabled(), timeoutMillis = 15_000)
 
-        // Add one part: 04 Bearing cap, issue 13 Heavy wear.
+        // Add one part: 04 Bearing cap, issue 50 Normal (pinned first, so it is on screen without scrolling).
         compose.onNodeWithTag(FindingsTags.ADD_PART).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.SHEET), timeoutMillis = 10_000)
         pickCode("Part", "Bearing cap")
-        pickCode("Issue", "Heavy wear")
+        pickCode("Issue", "Normal")
         compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.DRAFT), timeoutMillis = 10_000)
         compose.onNodeWithTag(FindingsTags.CLOSE).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilDoesNotExist(hasTestTag(FindingsTags.SHEET), timeoutMillis = 10_000)
@@ -89,7 +91,8 @@ class SubmitFlowTest {
     private fun pickCode(label: String, description: String) {
         compose.onNode(hasContentDescription("$label:", substring = true) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText(description) and hasClickAction(), timeoutMillis = 10_000)
-        compose.onNode(hasText(description) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+        // A "recently used" chip and the list row can both match: take the first.
+        compose.onAllNodes(hasText(description) and hasClickAction()).onFirst().performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasContentDescription("$label: ", substring = true) and
             hasContentDescription(description, substring = true), timeoutMillis = 10_000)
     }
