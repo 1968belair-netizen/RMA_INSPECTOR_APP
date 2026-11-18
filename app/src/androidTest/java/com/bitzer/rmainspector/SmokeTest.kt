@@ -13,7 +13,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
@@ -42,6 +44,8 @@ import org.junit.runner.RunWith
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
+// Sign in is pressed with the semantics click action, not a screen tap: after the wrong-password message appears
+// the layout (and keyboard) shifts, and a tap could land on the server "Retry" button instead (seen on CI).
 class SmokeTest {
     /** Each test starts signed out, whatever order JUnit runs them in (runs before the activity starts). */
     @get:Rule(order = 0) val signedOut = object : ExternalResource() {
@@ -62,13 +66,13 @@ class SmokeTest {
         compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
         compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("wrong")
         compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
-        compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
+        compose.onNodeWithTag(SignInTags.SUBMIT).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText("Wrong username or password."), timeoutMillis = 30_000)
 
         // Demo user signs in.
         compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("demo")
         compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
-        compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
+        compose.onNodeWithTag(SignInTags.SUBMIT).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 30_000)
         compose.onNodeWithText("Inspector: Demo Inspector (DI)", substring = true).assertExists()
 
@@ -201,6 +205,6 @@ class SmokeTest {
         compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
         compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("demo")
         compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
-        compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
+        compose.onNodeWithTag(SignInTags.SUBMIT).performSemanticsAction(SemanticsActions.OnClick)
     }
 }
