@@ -79,8 +79,12 @@ longer match the filters (§3.3).
 ### 3.3 Work list (below the search box)
 - Shows **only inspection status Received** (`work_list_statuses`, server setting).
 - **Filter chips** for **product type** and **return code**; the tablet remembers the last selection.
-  - Defaults (server settings): product types **Recip, Scroll, Screw, Part**; return codes **Inspection Only,
-    Repair & Return, Warranty**. The chips offer every product type and return code the server lists.
+  - Defaults (server settings): product types **Recip, Scroll, Screw, Part, (blank)**; return codes **Inspection
+    Only, Repair & Return, Warranty**. The chips offer every product type and return code the server lists.
+  - A **"(blank)"** chip (last in the product-type row, always offered, **on by default**) lists RMAs with **no
+    product type**, so they never drop off the work list (decision 2026-11-18, issue #36; api §5 token `(blank)`).
+    A selection remembered before this chip existed gets "(blank)" added once; after that, unticking it is
+    remembered like any other chip.
   - Matching is trimmed / uppercase on the server, so the SAP rollout can change values without an app update.
 - **Sort:** oldest `status_since` first, then RMA number.
 - Open = the Trend Tracker's rule (combined Macola header view `status='O'` joined to the inspection record).
