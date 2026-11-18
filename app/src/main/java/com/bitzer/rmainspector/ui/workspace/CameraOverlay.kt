@@ -1,7 +1,10 @@
 package com.bitzer.rmainspector.ui.workspace
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,6 +48,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.bitzer.rmainspector.ui.theme.BitzerColors
 import java.io.File
@@ -54,6 +59,7 @@ object CameraTags {
     const val SHUTTER = "camera_shutter"
     const val DONE = "camera_done"
     const val ALLOW = "camera_allow"
+    const val SETTINGS = "camera_settings"
 }
 
 /**
@@ -70,16 +76,36 @@ internal fun CameraOverlay(photos: PhotosState, cb: WorkspaceCallbacks) {
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> granted = ok; denied = !ok }
 
     Box(Modifier.fillMaxSize().background(BitzerColors.Black).testTag(CameraTags.OVERLAY)) {
+        // Back from the system settings screen: pick up a permission that was turned on there.
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+            val now = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            if (now != granted) { granted = now; if (now) denied = false }
+        }
         if (!granted) {
-            Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(if (denied) "Camera permission was denied. Allow it in the tablet's app settings to take photos." else "The app needs the camera to take inspection photos.",
-                    style = MaterialTheme.typography.bodyLarge, color = BitzerColors.White)
-                Button(onClick = { ask.launch(Manifest.permission.CAMERA) }, modifier = Modifier.heightIn(min = 56.dp).testTag(CameraTags.ALLOW)) { Text("Allow camera") }
-                TextButton(onClick = cb.onCloseCamera, modifier = Modifier.heightIn(min = 56.dp)) { Text("Cancel", color = BitzerColors.White) }
-            }
+            CameraPermissionPrompt(
+                denied = denied,
+                onAllow = { ask.launch(Manifest.permission.CAMERA) },
+                onOpenSettings = {
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                },
+                onCancel = cb.onCloseCamera,
+            )
             return@Box
         }
         CameraPreviewAndShutter(photos, cb)
+    }
+}
+
+/** Permission screen. After a denial the system may no longer show its dialog ("don't ask again"), so Settings is offered too. */
+@Composable
+internal fun BoxScope.CameraPermissionPrompt(denied: Boolean, onAllow: () -> Unit, onOpenSettings: () -> Unit, onCancel: () -> Unit) {
+    Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(if (denied) "Camera permission was denied. Turn on Camera for RMA Inspector in the tablet's app settings, then come back to take photos." else "The app needs the camera to take inspection photos.",
+            style = MaterialTheme.typography.bodyLarge, color = BitzerColors.White)
+        if (denied) Button(onClick = onOpenSettings, modifier = Modifier.heightIn(min = 56.dp).testTag(CameraTags.SETTINGS)) { Text("Open app settings") }
+        else Button(onClick = onAllow, modifier = Modifier.heightIn(min = 56.dp).testTag(CameraTags.ALLOW)) { Text("Allow camera") }
+        TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 56.dp)) { Text("Cancel", color = BitzerColors.White) }
     }
 }
 
@@ -98,11 +124,12 @@ private fun BoxScope.CameraPreviewAndShutter(photos: PhotosState, cb: WorkspaceC
             try {
                 val provider = future.get()
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+                // Back camera; a tablet with only a front camera uses that.
                 val selector = if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.DEFAULT_FRONT_CAMERA
                 provider.unbindAll()
                 provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
             } catch (e: Exception) {
-                error = "The camera isn't available on this tablet."
+                error = "The camera couldn't be started. Another app may be using it; close it and reopen the camera."
             }
         }, ContextCompat.getMainExecutor(context))
         onDispose { runCatching { if (future.isDone) future.get().unbindAll() } }
@@ -124,14 +151,22 @@ private fun BoxScope.CameraPreviewAndShutter(photos: PhotosState, cb: WorkspaceC
         onClick = {
             if (shooting || photos.busy) return@IconButton
             shooting = true
-            val out = File.createTempFile("capture", ".jpg", context.cacheDir)
-            imageCapture.takePicture(
-                ImageCapture.OutputFileOptions.Builder(out).build(), ContextCompat.getMainExecutor(context),
-                object : ImageCapture.OnImageSavedCallback {
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) { shooting = false; cb.onPhotoCaptured(out) }
-                    override fun onError(exception: ImageCaptureException) { shooting = false; out.delete(); error = "The photo couldn't be taken. Try again." }
-                },
-            )
+            error = null
+            // No space for even the temporary file, or the camera was lost: say so instead of crashing.
+            val out = try { File.createTempFile("capture", ".jpg", context.cacheDir) } catch (e: java.io.IOException) {
+                shooting = false; error = "The tablet is almost out of storage. Free some space, then try again."; return@IconButton
+            }
+            try {
+                imageCapture.takePicture(
+                    ImageCapture.OutputFileOptions.Builder(out).build(), ContextCompat.getMainExecutor(context),
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(output: ImageCapture.OutputFileResults) { shooting = false; cb.onPhotoCaptured(out) }
+                        override fun onError(exception: ImageCaptureException) { shooting = false; out.delete(); error = "The photo couldn't be taken. Try again." }
+                    },
+                )
+            } catch (e: Exception) {
+                shooting = false; out.delete(); error = "The photo couldn't be taken. Try again."
+            }
         },
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp).size(80.dp).background(BitzerColors.White, CircleShape).testTag(CameraTags.SHUTTER),
     ) { Icon(Icons.Filled.PhotoCamera, contentDescription = "Take photo", tint = BitzerColors.Black, modifier = Modifier.size(40.dp)) }

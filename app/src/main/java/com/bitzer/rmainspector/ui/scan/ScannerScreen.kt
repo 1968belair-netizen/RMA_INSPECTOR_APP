@@ -22,7 +22,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -47,7 +51,9 @@ fun ScannerScreen(onResult: (String) -> Unit, onClose: () -> Unit) {
     val hasCamera = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
     var granted by remember { mutableStateOf(hasPermission(context)) }
     var blocked by remember { mutableStateOf(false) }
-    var mode by remember { mutableStateOf(ScanMode.BARCODE) }
+    var mode by rememberSaveable { mutableStateOf(ScanMode.BARCODE) } // survives a tablet rotation
+    var cameraError by remember { mutableStateOf(false) }
+    var attempt by remember { mutableStateOf(0) }
     var reading by remember { mutableStateOf(false) }
     var override by remember { mutableStateOf<ScannerState?>(null) } // Found / PickLine / NothingRead
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -55,6 +61,11 @@ fun ScannerScreen(onResult: (String) -> Unit, onClose: () -> Unit) {
         if (!it) blocked = true
     }
     LaunchedEffect(Unit) { if (hasCamera && !granted) launcher.launch(Manifest.permission.CAMERA) }
+    // Back from the system settings screen: pick up a permission that was turned on there.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        val now = hasPermission(context)
+        if (now != granted) { granted = now; if (now) blocked = false }
+    }
 
     // Barcode found: show it for a moment, then hand it back so the search runs.
     val found = override as? ScannerState.Found
@@ -67,6 +78,7 @@ fun ScannerScreen(onResult: (String) -> Unit, onClose: () -> Unit) {
         !hasCamera -> ScannerState.NoCamera
         !granted -> ScannerState.NeedsPermission(blocked)
         override != null -> override!!
+        cameraError -> ScannerState.CameraUnavailable
         else -> ScannerState.Scanning(mode, reading)
     }
 
@@ -80,7 +92,7 @@ fun ScannerScreen(onResult: (String) -> Unit, onClose: () -> Unit) {
         onModeChange = { mode = it },
         onCapture = { reading = true; capture.set(true) },
         onPickLine = onResult,
-        onRetry = { override = null; reading = false },
+        onRetry = { override = null; reading = false; if (cameraError) { cameraError = false; attempt++ } },
         onGrantPermission = { launcher.launch(Manifest.permission.CAMERA) },
         onOpenAppSettings = {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
@@ -88,14 +100,15 @@ fun ScannerScreen(onResult: (String) -> Unit, onClose: () -> Unit) {
         },
         onClose = onClose,
         preview = {
-            if (active) CameraPreview(
+            if (active && !cameraError) key(attempt) { CameraPreview(
                 currentMode = currentMode, capture = capture,
+                onCameraError = { cameraError = true },
                 onBarcode = { override = ScannerState.Found(it) },
                 onPlate = { lines ->
                     reading = false
                     override = if (lines.isEmpty()) ScannerState.NothingRead else ScannerState.PickLine(lines)
                 },
-            )
+            ) }
         },
     )
 }
@@ -109,6 +122,7 @@ private fun CameraPreview(
     capture: AtomicBoolean,
     onBarcode: (String) -> Unit,
     onPlate: (List<String>) -> Unit,
+    onCameraError: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -119,13 +133,14 @@ private fun CameraPreview(
     val done = remember { AtomicBoolean(false) }
     val onBarcodeNow by rememberUpdatedState(onBarcode)
     val onPlateNow by rememberUpdatedState(onPlate)
+    val onCameraErrorNow by rememberUpdatedState(onCameraError)
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
 
     DisposableEffect(lifecycleOwner) {
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
         providerFuture.addListener({
-            val p = providerFuture.get()
+            val p = try { providerFuture.get() } catch (e: Exception) { onCameraErrorNow(); return@addListener }
             provider = p
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
             val analysis = ImageAnalysis.Builder()
@@ -158,10 +173,17 @@ private fun CameraPreview(
                     proxy.close()
                 }
             }
-            runCatching {
+            // Back camera; a tablet with only a front camera uses that. Busy / missing camera -> error screen with Try again.
+            val bound = runCatching {
+                val selector = when {
+                    p.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
+                    p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
+                    else -> error("no camera")
+                }
                 p.unbindAll()
-                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                p.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
             }
+            if (bound.isFailure) onCameraErrorNow()
         }, ContextCompat.getMainExecutor(context))
         onDispose {
             provider?.unbindAll()

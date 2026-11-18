@@ -13,12 +13,21 @@ object ScanParsing {
         """^(?:s\s*/\s*n|s\.n\.|sn|serial\s*(?:no\.?|number|num\.?|#)?)(?:\s*[:#.\-]\s*|\s+)""",
         RegexOption.IGNORE_CASE,
     )
+    /** "RMA 912345", "RMA#912345", "RMA No: 912345", "RMA912345" — the document type in front of the number. */
+    private val rmaPrefix = Regex(
+        """^rma(?:\s*(?:no\.?|number|num\.?|#))?(?:\s*[:#.\-]\s*|\s+)|^rma(?=\d)""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val urlStart = Regex("""^[A-Za-z][A-Za-z0-9+.\-]*://""")
+    /** Query keys a QR link may carry the number in (first match wins, in this order). */
+    private val urlKeys = listOf("rma", "rmano", "rma_no", "rmanumber", "serial", "sn", "id")
     private val allowed = Regex("""^[A-Za-z0-9][A-Za-z0-9\-/._ ]*$""")
 
     /** Barcode / QR payload -> search text, or null when there is nothing usable. First line only, trimmed, capped. */
     fun fromBarcode(raw: String?): String? {
         val line = raw?.lineSequence()?.map { clean(it) }?.firstOrNull { it.isNotEmpty() } ?: return null
-        return stripLabel(line).take(MAX_LENGTH).trim().ifEmpty { null }
+        val value = if (urlStart.containsMatchIn(line)) fromUrl(line) ?: return null else line
+        return stripLabel(value).take(MAX_LENGTH).trim().ifEmpty { null }
     }
 
     /**
@@ -35,10 +44,32 @@ object ScanParsing {
             .toList()
     }
 
-    private fun clean(s: String) = s.filter { !it.isISOControl() }.replace(Regex("\\s+"), " ").trim()
+    /**
+     * A QR code that holds a link: use the number in a known query key (`?rma=912345`), else the last path segment
+     * (`/rma/912345`). A bare host (`https://example.invalid/`) has nothing to search for -> null.
+     */
+    private fun fromUrl(url: String): String? {
+        val noFragment = url.substringBefore('#')
+        val afterScheme = noFragment.substringAfter("://")
+        val query = afterScheme.substringAfter('?', "")
+        val fromQuery = query.split('&', ';').mapNotNull { pair ->
+            val key = pair.substringBefore('=').lowercase()
+            val value = pair.substringAfter('=', "")
+            if (key in urlKeys && value.isNotBlank()) key to decode(value) else null
+        }.minByOrNull { urlKeys.indexOf(it.first) }?.second
+        if (fromQuery != null) return clean(fromQuery).ifEmpty { null }
+        val path = afterScheme.substringBefore('?').substringAfter('/', "")
+        val segment = path.split('/').lastOrNull { it.isNotBlank() } ?: return null
+        return clean(decode(segment)).ifEmpty { null }
+    }
+
+    private fun decode(s: String): String = runCatching { java.net.URLDecoder.decode(s, "UTF-8") }.getOrDefault(s)
+
+    // Also drops zero-width characters and the byte-order mark some label printers / scanner apps prepend.
+    private fun clean(s: String) = s.filter { !it.isISOControl() && it !in "\u200B\u200C\u200D\u2060\uFEFF" }.replace(Regex("\\s+"), " ").trim()
 
     private fun stripLabel(s: String): String {
-        val stripped = labelPrefix.replace(s, "").trim()
+        val stripped = rmaPrefix.replace(labelPrefix.replace(s, ""), "").trim()
         // Never strip a line down to nothing (a plain "SN" is not a serial label + value).
         return if (stripped.isEmpty()) s else stripped
     }
