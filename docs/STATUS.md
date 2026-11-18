@@ -13,17 +13,15 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 |---|---|---|---|
 | #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅, emulator running. Merge when green and acceptance met. |
 | #42 | — | `docs/approve-q3-q4-q6` | Docs: Q3/4/6 approved; rebased on main after #39. |
-| (coming) | #19 D1 Camera search | `feature/d1-camera-search` | thread started 2026-11-18 ~13:35 |
-| (coming) | #7 B2 Photos | `feature/b2-photos` | thread started 2026-11-18 ~13:35 (B1 merged) |
+| #44 | #7 B2 Photos | `feature/b2-photos` | in CI (build + emulator running). Merge when green and acceptance met. |
 
-**Merged this session:** #39 B1 Findings tab (merged by Jacob); #37 A6 "(blank)" chip (squash 8777e16, 13:50 ET).
+**Merged this session:** #39 B1 Findings tab (merged by Jacob); #37 A6 "(blank)" chip (squash 8777e16); #43 D1 camera search (squash 91cbe41). Real-tablet test of the camera is still needed.
 
 ### Open issues
 | Issue | Milestone | State | Branch | Depends on |
 |---|---|---|---|---|
 | #10 C1 Report tab | C | PR #40 | `feature/c1-report-tab` | — |
 | #7 B2 Photos tab | B | **in progress** | `feature/b2-photos` | B1 ✅ |
-| #19 D1 Camera search | D | **in progress** | `feature/d1-camera-search` | — |
 | #8 B3 Submit inspection | B | not started | — | B2 (B1 ✅) |
 | #9 B4 Offline queue, conflicts, lock/retry | B | not started | — | B3. Acceptance includes the 2026-11-18 queue/sign-out rules |
 | #11 C2 Submit report | C | not started | — | B3 (and C1) |
@@ -32,16 +30,16 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 | #21 S1 Real server, read-only | server | **ready**, local on Jacob's laptop | — | — |
 | #22 S2 Real server, write side | server | later, local | — | matching tablet issues |
 
-(#5 B1 and #36 A6 are closed by their merges.)
+(#5 B1, #36 A6 and #19 D1 are closed by their merges.)
 
 ## 2. Work in progress and exact next steps
 1. **#40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
    still blocked, post "READY TO MERGE: #n" in chat and keep working.
-2. **#7 B2 and #19 D1** are running in Sonnet threads (worktrees `/home/claude/wt-b2`, `/home/claude/wt-d1`).
-3. **Keep 3 issues in progress:** next candidates are #8 B3 (after B2) → #9 B4, #11 C2 (after B3 + C1) and #20 D2.
+2. **#7 B2** (PR #44) is in a Sonnet thread (worktree `/home/claude/wt-b2`). #19 D1 is done.
+3. **Only 2 issues in progress (#10, #7):** every remaining issue depends on B2/B3/C1 (or is local server work), so nothing else can start yet. When B2 merges start #8 B3 and #20 D2 together. Candidates: next candidates are #8 B3 (after B2) → #9 B4, #11 C2 (after B3 + C1) and #20 D2.
 4. **After B and C are done**, post one short milestone report covering both (APK link, screenshots, tests, gaps,
    questions). Jacob tests B and C together on his phone.
-5. Worktrees used by threads: `/home/claude/wt-b2`, `/home/claude/wt-d1` (earlier ones are gone). These are
+5. Worktrees used by threads: `/home/claude/wt-b2` (earlier ones are gone). These are
    session-local; a new session starts from a fresh clone.
 6. Thread rules file (session-local copy): the same content is in CLAUDE.md "Rapid development mode" and below.
 

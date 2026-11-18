@@ -12,4 +12,4 @@ was done meanwhile (work continues on other issues). Jacob answers here or in ch
 | 10 | 2026-11-18 | #5 | When an RMA with a draft is opened and the server's signature differs from the draft's `base_signature`, when is the inspector told? | **Recommended:** straight away — the "changed elsewhere" banner shows on open (the draft is kept, nothing overwritten); the full review comes with Submit / conflicts (B3/B4). Alt: only at submit (`409 RMA_CHANGED`). | Banner shown on open. |
 | 11 | 2026-11-18 | #19 | How should a scan fill the search box? | **Recommended:** barcode / QR reads automatically (first usable line, trimmed, "S/N:" style label removed) and runs the search; serial plates need a **Capture** tap, then the inspector picks one recognised line (only lines with a digit and 4+ characters are offered). Alt: always auto-run on the first plate line. | Built as recommended (`ScanParsing`, `ScannerScreen`). |
 
-_#1–6 answered 2026-11-18 — see `docs/decisions.md`. Open: #7–10 (from B1)._
+_#1–6 answered 2026-11-18 — see `docs/decisions.md`. Open: #7–10 (B1), #11 (D1 camera search)._
