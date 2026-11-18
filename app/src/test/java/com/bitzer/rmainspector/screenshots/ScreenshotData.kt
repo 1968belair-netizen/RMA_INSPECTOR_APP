@@ -23,6 +23,9 @@ import com.bitzer.rmainspector.ui.home.HomeState
 import com.bitzer.rmainspector.ui.home.SearchState
 import com.bitzer.rmainspector.ui.home.WorkListState
 import com.bitzer.rmainspector.ui.signin.SignInState
+import com.bitzer.rmainspector.ui.workspace.GuidedButton
+import com.bitzer.rmainspector.ui.workspace.WorkspaceLoad
+import com.bitzer.rmainspector.ui.workspace.WorkspaceState
 
 /** FAKE data for screenshots — mirrors the mock server's fake RMAs. */
 object ScreenshotData {
@@ -99,6 +102,17 @@ object ScreenshotData {
         lock = LockState(locked = true, heldBy = "JDOE2", host = "EXAMPLE-PC"))
     val rmaScroll = rma.copy(rmaId = "912348", displayNumber = "912348", productType = "Scroll", productTypeKey = "scroll",
         capabilities = Capabilities())
+    val rmaClosed = rma.copy(rmaId = "912349", displayNumber = "912349", isOpen = false, capabilities = Capabilities(),
+        header = rma.header.copy(inspectionStatus = c("Closed")))
+
+    // Inspection workspace (A5)
+    private fun ws(r: RmaDetail) = WorkspaceState(load = WorkspaceLoad.Loaded(r), guided = GuidedButton.Unavailable(r.productType))
+    val workspace = ws(rma.copy(photos = PhotoFolder(folderFound = true, folderDisplay = "912xxx\\9123xx\\912345\\All Pics", count = 2,
+        files = listOf("00-1 As received.jpg", "00-2 Nameplate.jpg"))))
+    val workspaceLocked = ws(rmaLocked.copy(productType = "Screw", productTypeKey = "screw", parts = emptyList(),
+        header = rma.header.copy(model = "HSN7471-75", failedSerialNo = "25X0000002")))
+    val workspaceScroll = ws(rmaScroll.copy(parts = emptyList(), header = rma.header.copy(model = "GSD60235VAB", failedSerialNo = "25X0000004")))
+    val workspaceClosed = ws(rmaClosed)
 
     // --- Code pickers (A3). FAKE codes, shaped like the mock server's lists.
     val issueCodes = listOf(

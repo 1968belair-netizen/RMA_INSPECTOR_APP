@@ -22,7 +22,7 @@ data class Code(
 
 /** What the tablet writes back: group + code only, both always present (group may be null). */
 @Serializable
-data class CodeKey(val group: String?, val code: String)
+data class CodeKey(val group: String? = null, val code: String)
 
 /** Natural order: group first (null groups first), then code — `48` < `48a` < `100`. */
 object CodeOrder : Comparator<Code> {
@@ -64,6 +64,28 @@ data class HiddenCodes(
     val causes: List<CodeKey> = emptyList(),
 )
 
+/** One photo slot of a guided step (api §4): `required_when` = always · non_normal · never. */
+@Serializable
+data class ChecklistPhoto(
+    val slot: String,
+    val label: String = "",
+    @SerialName("required_when") val requiredWhen: String = "never",
+)
+
+@Serializable
+data class ChecklistStep(
+    @SerialName("part_code") val partCode: CodeKey,
+    val required: Boolean = false,
+    val photos: List<ChecklistPhoto> = emptyList(),
+)
+
+/** A server-served guided inspection list for one product type (api §4, spec §5). */
+@Serializable
+data class Checklist(
+    val version: String = "",
+    val steps: List<ChecklistStep> = emptyList(),
+)
+
 @Serializable
 data class CodeLists(
     val version: String = "",
@@ -90,6 +112,8 @@ data class CodeLists(
     @SerialName("photo_tags") val photoTags: List<String> = emptyList(),
     @SerialName("summary_template") val summaryTemplate: String = "",
     val limits: Map<String, Int> = emptyMap(),
+    /** Guided inspection lists keyed by `product_type_key` (api §4). Empty in v1. */
+    val checklists: Map<String, Checklist> = emptyMap(),
 ) {
     /** The cause picker is shown only when the server sends causes (none for Macola). */
     val causesEnabled: Boolean get() = causes.isNotEmpty()
