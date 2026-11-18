@@ -28,6 +28,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import com.bitzer.rmainspector.ui.home.HomeTags
 import com.bitzer.rmainspector.ui.signin.SignInTags
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import com.bitzer.rmainspector.ui.workspace.FindingsTags
 import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
 import com.bitzer.rmainspector.ui.workspace.WorkspaceTags
 import kotlinx.coroutines.runBlocking
@@ -53,6 +56,7 @@ class SmokeTest {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             ServiceLocator.auth(context).clear()
             runBlocking { ServiceLocator.settings(context).clearWorkListFilter() } // server-default chips
+            ServiceLocator.drafts(context).clearAll() // no drafts left over from another test
         }
     }
 
@@ -174,6 +178,99 @@ class SmokeTest {
         signInAsDemo()
         compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("5 RMAs"), timeoutMillis = 30_000)
         assertWorkListOrder(listOf("912346", "912345", "912352", "912355", "912357"))
+    }
+
+    /**
+     * Issue #5 (B1): add a part, edit it and a desk row, reorder, delete with undo — and the local draft is still
+     * there when the RMA is opened again (a new screen reads it back from the device).
+     */
+    @Test
+    fun findingsAddEditReorderDeleteAndDraftKept() {
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
+        signInAsDemo()
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 30_000)
+        openBySearch("912345")
+        compose.waitUntilAtLeastOneExists(findingRow("Winding resistance"), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.ADD_PART) and isEnabled(), timeoutMillis = 10_000)
+
+        // Add: new row → sheet → part 04 Bearing cap, issue 13 Heavy wear, a note.
+        compose.onNodeWithTag(FindingsTags.ADD_PART).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.SHEET), timeoutMillis = 10_000)
+        pickCode("Part", "Bearing cap")
+        pickCode("Issue", "Heavy wear")
+        compose.onNodeWithTag(FindingsTags.NOTE).performTextReplacement("Example note from the emulator test")
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.DRAFT), timeoutMillis = 10_000)
+
+        // Reorder: the new row (last) moves up one, above 48a.
+        compose.onNodeWithTag(FindingsTags.MOVE_UP).performSemanticsAction(SemanticsActions.OnClick)
+        closeSheet()
+        assertAbove(findingRow("Bearing cap"), findingRow("Winding resistance"))
+        assertAbove(findingRow("Terminal box"), findingRow("Bearing cap"))
+
+        // Edit a desk row (from the server): 07a issue → 10 Dirty.
+        compose.onNode(findingRow("Terminal box")).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.SHEET), timeoutMillis = 10_000)
+        pickCode("Issue", "Dirty")
+        closeSheet()
+        compose.waitUntilAtLeastOneExists(findingRow("Terminal box") and hasText("Dirty", substring = true), timeoutMillis = 10_000)
+
+        // Delete with undo.
+        compose.onNode(findingRow("Terminal box")).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.DELETE), timeoutMillis = 10_000)
+        compose.onNodeWithTag(FindingsTags.DELETE).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.UNDO), timeoutMillis = 10_000)
+        compose.waitUntilDoesNotExist(findingRow("Terminal box"), timeoutMillis = 10_000)
+        compose.onNodeWithTag(FindingsTags.UNDO).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(findingRow("Terminal box"), timeoutMillis = 10_000)
+        // …and delete it for good.
+        compose.onNode(findingRow("Terminal box")).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.DELETE), timeoutMillis = 10_000)
+        compose.onNodeWithTag(FindingsTags.DELETE).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilDoesNotExist(findingRow("Terminal box"), timeoutMillis = 10_000)
+
+        // Leave and open the RMA again: the draft comes back from the device, in the same order.
+        back()
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 10_000)
+        openBySearch("912345")
+        compose.waitUntilAtLeastOneExists(findingRow("Bearing cap"), timeoutMillis = 15_000)
+        compose.onNodeWithTag(FindingsTags.DRAFT).assertExists()
+        assertAbove(findingRow("Bearing cap"), findingRow("Winding resistance"))
+        assertTrue(compose.onAllNodes(findingRow("Terminal box")).fetchSemanticsNodes().isEmpty())
+        compose.onNode(findingRow("Bearing cap") and hasText("Heavy wear", substring = true)).assertExists()
+    }
+
+    /** A Findings list row containing [text]. */
+    private fun findingRow(text: String) =
+        SemanticsMatcher("finding row") { n ->
+            n.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("finding_row_") == true
+        } and hasText(text, substring = true)
+
+    /** Opens the dropdown labelled [label] in the part sheet and picks the code with [description]. */
+    private fun pickCode(label: String, description: String) {
+        compose.onNode(hasContentDescription("$label:", substring = true) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasText(description) and hasClickAction(), timeoutMillis = 10_000)
+        compose.onNode(hasText(description) and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasContentDescription("$label: ", substring = true) and
+            hasContentDescription(description, substring = true), timeoutMillis = 10_000)
+    }
+
+    private fun closeSheet() {
+        compose.onNodeWithTag(FindingsTags.CLOSE).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilDoesNotExist(hasTestTag(FindingsTags.SHEET), timeoutMillis = 10_000)
+    }
+
+    private fun assertAbove(upper: SemanticsMatcher, lower: SemanticsMatcher) {
+        compose.waitForIdle()
+        val top = { m: SemanticsMatcher -> compose.onAllNodes(m).fetchSemanticsNodes().firstOrNull()?.boundsInRoot?.top }
+        val a = top(upper)
+        val b = top(lower)
+        assertTrue("Expected $upper above $lower (tops: $a, $b)", a != null && b != null && a < b)
+    }
+
+    private fun openBySearch(rma: String) {
+        compose.onNode(hasSetTextAction()).performTextReplacement(rma)
+        compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
     }
 
     /** Each card appears below the one before it (scrolls the lazy list as needed). */

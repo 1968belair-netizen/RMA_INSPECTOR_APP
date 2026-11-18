@@ -115,6 +115,9 @@ the header. The **guided inspection button** is in the header (§5).
 - Pickers: search by code or description; natural sort; codes are code objects sent back exactly as received;
   "recently used" strip.
 - **Manual entry has no requirements** (required items exist only in guided mode).
+- **Local draft:** every change is saved at once to a draft on the tablet (one per inspector and RMA, with the
+  RMA's `signature` as `base_signature`); it survives an app kill. Existing rows keep their `row_id`, new rows have
+  `row_id: null`. The draft is removed when the rows match the server again (and after a successful submit, §6.4).
 - Button: **Submit inspection** (§6).
 
 ### 4.4 Photos tab

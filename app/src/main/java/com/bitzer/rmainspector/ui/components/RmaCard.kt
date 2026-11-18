@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
@@ -33,6 +34,9 @@ import com.bitzer.rmainspector.data.RmaListItem
 import com.bitzer.rmainspector.ui.theme.BitzerColors
 import java.time.LocalDate
 
+/** Badge for an RMA kept on the work list only because it has a draft on this tablet (spec §3.2, §3.3). */
+const val DRAFT_CHANGED_BADGE = "Return code / status changed"
+
 /** Read only on the tablet: closed, not inspectable, or scroll (handled in the repair database). */
 val RmaListItem.readOnly: Boolean get() = !isOpen || !inspectable || productTypeKey == "scroll"
 
@@ -42,7 +46,7 @@ val RmaListItem.readOnly: Boolean get() = !isOpen || !inspectable || productType
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RmaCard(item: RmaListItem, today: LocalDate, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun RmaCard(item: RmaListItem, today: LocalDate, onClick: () -> Unit, modifier: Modifier = Modifier, draftChanged: Boolean = false) {
     Card(
         modifier = modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = if (item.readOnly) BitzerColors.Grey10 else BitzerColors.White),
@@ -66,6 +70,7 @@ fun RmaCard(item: RmaListItem, today: LocalDate, onClick: () -> Unit, modifier: 
                     }
                     if (item.locked) Badge("Open elsewhere", Icons.Filled.Lock, BitzerColors.Warning, Color(0xFFFFF1DC))
                     if (item.readOnly) Badge("Read only", Icons.Filled.Visibility, BitzerColors.Grey90, BitzerColors.White)
+                    if (draftChanged) Badge(DRAFT_CHANGED_BADGE, Icons.Filled.EditNote, BitzerColors.Warning, Color(0xFFFFF1DC))
                 }
                 Text(
                     listOf(

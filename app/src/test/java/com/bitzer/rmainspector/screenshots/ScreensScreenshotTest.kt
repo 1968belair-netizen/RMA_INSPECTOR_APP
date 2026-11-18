@@ -89,6 +89,14 @@ abstract class ScreenCatalog(private val device: String) {
     @Test fun workspace_changed_elsewhere() = shot("workspace_changed_elsewhere") {
         workspace(ScreenshotData.workspace.copy(changedElsewhere = true))
     }
+    // --- Findings tab (B1): list, part sheet, empty, long note, undo
+    @Test fun findings_list() = shot("findings_list") { workspace(ScreenshotData.workspaceFindings) }
+    @Test fun findings_sheet() = shot("findings_sheet") { workspace(ScreenshotData.workspaceFindingSheet) }
+    @Test fun findings_empty() = shot("findings_empty") { workspace(ScreenshotData.workspaceFindingsEmpty) }
+    @Test fun findings_long_note() = shot("findings_long_note") { workspace(ScreenshotData.workspaceFindingLongNote) }
+    @Test fun findings_undo() = shot("findings_undo") { workspace(ScreenshotData.workspaceFindingsUndo) }
+    @Test fun home_draft_changed() = shot("home_draft_changed") { home(ScreenshotData.homeDraftChanged) }
+
     @Test fun workspace_not_found() = shot("workspace_not_found") {
         workspace(WorkspaceState(load = WorkspaceLoad.Error("RMA 999 was not found.", notFound = true)))
     }

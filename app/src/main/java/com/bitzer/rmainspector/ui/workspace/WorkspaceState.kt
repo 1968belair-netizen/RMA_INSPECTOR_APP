@@ -1,7 +1,12 @@
 package com.bitzer.rmainspector.ui.workspace
 
 import com.bitzer.rmainspector.data.Checklist
+import com.bitzer.rmainspector.data.CodeKey
+import com.bitzer.rmainspector.data.CodeLists
+import com.bitzer.rmainspector.data.DeletedRow
+import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.RmaDetail
+import com.bitzer.rmainspector.data.toFindingRows
 
 /** Workspace tabs (spec §4.2). Filled in milestones B (Findings, Photos) and C (Report). */
 enum class WorkspaceTab(val label: String) {
@@ -52,10 +57,44 @@ data class WorkspaceState(
     val failureExpanded: Boolean = false,
     val guided: GuidedButton = GuidedButton.Unavailable(""),
     val changedElsewhere: Boolean = false,
+    val findings: FindingsState = FindingsState(),
 ) {
     val rma: RmaDetail? get() = (load as? WorkspaceLoad.Loaded)?.rma
     val banners: List<WorkspaceBanner> get() = rma?.let { workspaceBanners(it, changedElsewhere) }.orEmpty()
     val readOnly: Boolean get() = rma?.isReadOnly ?: true
+
+    /** Findings can be edited: not read only and the product type allows findings. */
+    val findingsEditable: Boolean get() = !readOnly && rma?.capabilities?.findings == true
+
+    /** Rows shown on the Findings tab: the draft's rows, else the server's rows in server order. */
+    val findingRows: List<FindingRow> get() = findings.rows ?: rma?.parts?.toFindingRows().orEmpty()
+}
+
+/**
+ * Findings tab (spec §4.3).
+ * - [rows]: the inspector's rows (draft or freshly loaded); null = not set yet → the server's rows are shown.
+ * - [hasDraft]: a local draft exists for this RMA and inspector (saved on every change).
+ * - [codes]: code lists on the device (pickers); null until loaded.
+ * - [recentParts] / [recentIssues] / [recentCauses]: "recently used" strips of the pickers.
+ * - [undo]: the last deleted row, while its Undo is offered.
+ * - [photoCounts]: photos per row, keyed by [FindingRow.localId] — filled by B2 (#7); empty until then.
+ */
+data class FindingsState(
+    val rows: List<FindingRow>? = null,
+    val hasDraft: Boolean = false,
+    val codes: CodeLists? = null,
+    val recentParts: List<CodeKey> = emptyList(),
+    val recentIssues: List<CodeKey> = emptyList(),
+    val recentCauses: List<CodeKey> = emptyList(),
+    val undo: DeletedRow? = null,
+    val photoCounts: Map<String, Int> = emptyMap(),
+) {
+    /** Note limit from the server (`limits.note`), 4000 by default. */
+    val noteLimit: Int get() = codes?.limits?.get("note") ?: DEFAULT_NOTE_LIMIT
+
+    companion object {
+        const val DEFAULT_NOTE_LIMIT = 4000
+    }
 }
 
 /** No capability at all (closed, not inspectable, scroll, product type not enabled) → the workspace is read only. */

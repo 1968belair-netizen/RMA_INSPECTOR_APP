@@ -35,6 +35,14 @@ object ServiceLocator {
             recent ?: RecentCodesStore(File(context.applicationContext.filesDir, "codelists/recent.json")).also { recent = it }
         }
 
+    @Volatile private var draftStore: DraftStore? = null
+
+    /** Local inspection drafts, one file per inspector and RMA (spec §4.3, §8). */
+    fun drafts(context: Context): DraftStore =
+        draftStore ?: synchronized(this) {
+            draftStore ?: DraftStore(File(context.applicationContext.filesDir, "drafts")).also { draftStore = it }
+        }
+
     fun settings(context: Context): SettingsStore =
         store ?: synchronized(this) {
             store ?: SettingsStore(context.applicationContext, BuildConfig.DEFAULT_SERVER_URL).also { store = it }

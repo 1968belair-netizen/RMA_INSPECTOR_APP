@@ -270,7 +270,8 @@ fun HomeContent(
                         }
                         items(ws.items, key = { "w-" + it.rmaId }) { item ->
                             RmaCard(item, today, onClick = { onOpenRma(item.rmaId) },
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag(HomeTags.workItem(item.rmaId)))
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag(HomeTags.workItem(item.rmaId)),
+                                draftChanged = item.rmaId in ws.draftChanged)
                         }
                     }
                 }
