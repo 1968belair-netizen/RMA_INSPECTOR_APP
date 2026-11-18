@@ -8,27 +8,29 @@ mode. Offline-queue edge cases, conflict screens and lock handling beyond the ba
 **Milestones:** A done · B/C in progress · **E Demo** (new, #45, #46). Report "DEMO READY" + APK link + `docs/demo.md` when done.
 
 ### Demo critical path
-`#44 B2 Photos` → `#8 B3 Submit inspection` → `#11 C2 Submit report` (needs `#40 C1` too) → `docs/demo.md`.
+`#7 B2` ✅ → `#8 B3 Submit inspection` ∥ `#11 C2 Submit report` (C1 ✅) → `docs/demo.md` → DEMO READY.
 In parallel: `#45 M1` mock PDF, `#46 M2` demo dataset + checklist; then `#20 D2` guided inspection if time allows.
 
 ### Open PRs
 | PR | Issue | Branch | State |
 |---|---|---|---|
-| #44 | #7 B2 Photos | `feature/b2-photos` | build ✅; first emulator run killed by a runner shutdown (infra). **Conflicts with merged C1** (ApiClient, ServiceLocator, WorkspaceScreen/State) — B2 thread merging main now (14:45 ET). |
+| (coming) | #8 B3 Submit inspection | `feature/b3-submit-inspection` | thread started 2026-11-18 ~15:05 ET |
+| (coming) | #11 C2 Submit report (spell check → build → PDF preview) | `feature/c2-submit-report` | thread started ~15:05 ET |
+| (coming) | #20 D2 Guided inspection | `feature/d2-guided-inspection` | thread started ~15:05 ET; nice-to-have |
 
-**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 docs · #49 M1 mock report PDF · #48 M2 demo dataset + checklist + run script · #47 demo-plan docs · #50 docs · **#40 C1 Report tab (26fd4e1, 14:41 ET)**.
+**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 docs · #49 M1 mock report PDF · #48 M2 demo dataset + checklist + run script · #47 demo-plan docs · #50 docs · #40 C1 Report tab (26fd4e1, 14:41 ET) · **#44 B2 Photos (330c875, 15:00 ET)**.
 **Emulator tests on main (A6 + B1 together): ✅ passed** (run on PR #47, 2026-11-18 14:12 ET).
 
 ### Open issues
 | Issue | Milestone | State | Depends on |
 |---|---|---|---|
-| #7 B2 Photos | B | PR #44 (conflicts with main; thread rebasing) | B1 ✅ |
+| #7 B2 Photos | B | **done** (#44) | B1 ✅ |
 | #10 C1 Report tab | C | **done** (#40) | — |
 | #45 M1 Mock report PDF | E Demo | **done** (#49) | — |
 | #46 M2 Demo dataset + checklist + run script | E Demo | **done** (#48) | — |
-| #8 B3 Submit inspection | B | not started (banner only for offline; no queue edge cases) | B2 |
-| #11 C2 Submit report | C | not started | B3, C1 |
-| #20 D2 Guided inspection | D | not started — if time allows | B2, #46 checklist |
+| #8 B3 Submit inspection | B | **in progress** (happy path; offline = message only) | B2 ✅ |
+| #11 C2 Submit report | C | **in progress** (parallel with B3) | C1 ✅ |
+| #20 D2 Guided inspection | D | **in progress** (nice-to-have) | B2 ✅, #46 checklist ✅ |
 | #9 B4 Queue, conflicts, lock/retry | B | **deferred until after the demo** | B3 |
 | #34 Idea: pre-filled checklist | D | **idea — do not implement** | — |
 | #21 S1 Real server, read-only | server | ready, local on Jacob's laptop. Acceptance now explicitly includes `(blank)` in `work_list_product_types` defaults + the `(blank)` token | — |
