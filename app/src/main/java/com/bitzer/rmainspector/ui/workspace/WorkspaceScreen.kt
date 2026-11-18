@@ -26,7 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
@@ -44,7 +43,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -90,6 +88,16 @@ data class WorkspaceCallbacks(
     val onToggleFailureInfo: () -> Unit = {},
     val onGuided: () -> Unit = {},
     val onReviewChanges: () -> Unit = {},
+    // Findings (B1): rows are addressed by FindingRow.localId; indices are list positions.
+    val onAddPart: () -> Unit = {},
+    val onSetPart: (localId: String, code: Code) -> Unit = { _, _ -> },
+    val onSetIssue: (localId: String, code: Code) -> Unit = { _, _ -> },
+    val onSetCause: (localId: String, code: Code?) -> Unit = { _, _ -> },
+    val onSetNote: (localId: String, note: String) -> Unit = { _, _ -> },
+    val onMoveRow: (from: Int, to: Int) -> Unit = { _, _ -> },
+    val onDeleteRow: (localId: String) -> Unit = {},
+    val onUndoDelete: () -> Unit = {},
+    val onDismissUndo: () -> Unit = {},
 )
 
 /** Width from which the tabs show list and detail side by side (11" tablet landscape ≈ 1280 dp). */
@@ -109,6 +117,15 @@ fun WorkspaceScreen(onBack: () -> Unit, vm: WorkspaceViewModel = viewModel()) {
             onToggleFailureInfo = vm::toggleFailureInfo,
             onGuided = vm::startGuided,
             onReviewChanges = vm::reviewChanges,
+            onAddPart = vm::addPart,
+            onSetPart = vm::setPart,
+            onSetIssue = vm::setIssue,
+            onSetCause = vm::setCause,
+            onSetNote = vm::setNote,
+            onMoveRow = vm::moveRow,
+            onDeleteRow = vm::deleteRow,
+            onUndoDelete = vm::undoDelete,
+            onDismissUndo = vm::dismissUndo,
         ),
     )
 }
@@ -308,7 +325,7 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
     val list: @Composable (Modifier) -> Unit = { m ->
         Box(m.testTag(WorkspaceTags.listPane(tab))) {
             when (tab) {
-                WorkspaceTab.FINDINGS -> FindingsList(rma, state.selection, state.readOnly, cb.onSelect)
+                WorkspaceTab.FINDINGS -> FindingsList(state, cb)
                 WorkspaceTab.PHOTOS -> PhotosList(rma, state.selection, cb.onSelect)
                 WorkspaceTab.REPORT -> ReportList(rma, state.selection, cb.onSelect)
             }
@@ -317,7 +334,7 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
     val detail: @Composable (Modifier) -> Unit = { m ->
         Box(m.testTag(WorkspaceTags.detailPane(tab))) {
             when (tab) {
-                WorkspaceTab.FINDINGS -> FindingsDetail(rma, state.selection)
+                WorkspaceTab.FINDINGS -> FindingSheet(state, cb)
                 WorkspaceTab.PHOTOS -> PhotosDetail(rma, state.selection)
                 WorkspaceTab.REPORT -> ReportDetail(rma)
             }
@@ -340,45 +357,6 @@ private fun TabBody(state: WorkspaceState, rma: RmaDetail, twoPane: Boolean, cb:
             }
             HorizontalDivider(color = BitzerColors.Grey30)
             detail(Modifier.weight(1f).fillMaxWidth())
-        }
-    }
-}
-
-// --- Findings (placeholder until B1)
-
-@Composable
-private fun FindingsList(rma: RmaDetail, selection: String?, readOnly: Boolean, onSelect: (String?) -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        PaneTitle("Parts", "${rma.parts.size} row${if (rma.parts.size == 1) "" else "s"}")
-        LazyColumn(Modifier.weight(1f)) {
-            if (rma.parts.isEmpty()) item { EmptyText("No parts recorded yet.") }
-            itemsIndexed(rma.parts, key = { _, r -> r.rowId }) { i, row ->
-                PartListRow(i, row, selected = row.rowId == selection) { onSelect(row.rowId) }
-            }
-        }
-        if (!readOnly) {
-            // "Add part" is always visible (spec §4.3); the part sheet comes in B1.
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 56.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Add part — coming in milestone B")
-            }
-        }
-    }
-}
-
-@Composable
-private fun FindingsDetail(rma: RmaDetail, selection: String?) {
-    val row = rma.parts.firstOrNull { it.rowId == selection }
-    DetailColumn {
-        if (row == null) {
-            Placeholder("Select a part to see it here.", "Editing parts, issues and notes comes in milestone B.")
-        } else {
-            PaneTitle("Part ${(rma.parts.indexOf(row) + 1).toString().padStart(2, '0')}", "Read only for now")
-            DetailField("Part", row.partCode.text())
-            DetailField("Issue", row.issueCode.text())
-            row.causeCode?.let { DetailField("Cause", it.text()) }
-            DetailField("Note", row.note)
         }
     }
 }

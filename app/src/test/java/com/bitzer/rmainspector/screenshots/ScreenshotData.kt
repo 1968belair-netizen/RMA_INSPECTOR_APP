@@ -4,6 +4,10 @@ import com.bitzer.rmainspector.data.AppSettings
 import com.bitzer.rmainspector.data.Capabilities
 import com.bitzer.rmainspector.data.Code
 import com.bitzer.rmainspector.data.CodeKey
+import com.bitzer.rmainspector.data.CodeLists
+import com.bitzer.rmainspector.data.DeletedRow
+import com.bitzer.rmainspector.data.FindingRow
+import com.bitzer.rmainspector.data.toFindingRows
 import com.bitzer.rmainspector.data.Flag
 import com.bitzer.rmainspector.data.Health
 import com.bitzer.rmainspector.data.LockState
@@ -23,6 +27,7 @@ import com.bitzer.rmainspector.ui.home.HomeState
 import com.bitzer.rmainspector.ui.home.SearchState
 import com.bitzer.rmainspector.ui.home.WorkListState
 import com.bitzer.rmainspector.ui.signin.SignInState
+import com.bitzer.rmainspector.ui.workspace.FindingsState
 import com.bitzer.rmainspector.ui.workspace.GuidedButton
 import com.bitzer.rmainspector.ui.workspace.WorkspaceLoad
 import com.bitzer.rmainspector.ui.workspace.WorkspaceState
@@ -135,4 +140,42 @@ object ScreenshotData {
     val recentParts = listOf(CodeKey(null, "48a"), CodeKey(null, "07"), CodeKey(null, "PV01"))
     val productTypeChips = listOf("Recip", "Scroll", "Screw", "Part", "Unknown").map { c(it) }
     val returnCodeChips = listOf("Inspection Only", "Repair & Return", "Warranty", "Core&Inspection").map { c(it) }
+
+    // --- Findings (B1). FAKE codes from the mock server's lists.
+    val findingCodes = CodeLists(
+        parts = listOf("07" to "Terminal plate", "07a" to "Terminal box", "44" to "Stator", "48" to "Winding to ground insulation",
+            "48a" to "Winding resistance", "62" to "Cylinder wall", "63" to "Piston assy / skirt", "64" to "Piston rings").map { c(it.first, it.second) },
+        issues = issueCodes,
+        normalIssueCodes = normalIssues,
+        limits = mapOf("note" to 4000),
+    )
+    val findingRows: List<FindingRow> = rma.parts.toFindingRows().let { server ->
+        listOf(
+            server[0],
+            server[1].copy(issueCode = c("39", "Winding fault"), note = "Phase T1-T2 open"),
+            FindingRow("new-1", null, c("63", "Piston assy / skirt"), c("34", "Scored / Scratched"), note = "Cyl 2 skirt scored\nlight on cyl 1"),
+            FindingRow("new-2", null, c("64", "Piston rings"), null),
+        )
+    }
+    private val findingsBase = FindingsState(rows = findingRows, hasDraft = true, codes = findingCodes,
+        recentParts = listOf(CodeKey(null, "63"), CodeKey(null, "48a")), photoCounts = mapOf("new-1" to 2))
+    val workspaceFindings = workspace.copy(findings = findingsBase)
+    val workspaceFindingSheet = workspaceFindings.copy(selection = "new-1")
+    val workspaceFindingsEmpty = workspace.copy(load = WorkspaceLoad.Loaded(rma.copy(parts = emptyList())),
+        findings = FindingsState(rows = emptyList(), codes = findingCodes))
+    val longNote: String = (1..14).joinToString("\n") { i ->
+        "Cyl $i: scoring on the skirt, thrust side, about 20 mm long; rings free in the grooves; no signs of liquid slugging " +
+            "or oil dilution on this cylinder. Wall shows matching marks."
+    }
+    val workspaceFindingLongNote = workspaceFindings.copy(
+        selection = "L2.x",
+        findings = findingsBase.copy(rows = findingRows.map { if (it.localId == "L2.x") it.copy(note = longNote) else it }),
+    )
+    val workspaceFindingsUndo = workspaceFindings.copy(
+        findings = findingsBase.copy(rows = findingRows.filterNot { it.localId == "new-2" }, undo = DeletedRow(findingRows[3], 3)),
+    )
+    val homeDraftChanged = homeDefault.copy(workList = homeDefault.workList.copy(
+        items = homeDefault.workList.items + item("912347", "4PE-15Y", "Recip", "recip", "Core&Inspection", "2026-11-02", serial = "25X0000003"),
+        draftChanged = setOf("912347"),
+    ))
 }

@@ -9,7 +9,10 @@ import com.bitzer.rmainspector.data.CodeLists
 import com.bitzer.rmainspector.data.RmaListItem
 import com.bitzer.rmainspector.data.ServiceLocator
 import com.bitzer.rmainspector.data.WorkListFilter
+import com.bitzer.rmainspector.data.WorkListDrafts
 import com.bitzer.rmainspector.data.WorkListRules
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +43,8 @@ data class WorkListState(
     val loading: Boolean = false,
     val error: String? = null,
     val loadedOnce: Boolean = false,
+    /** RMAs kept on the list only because this inspector has a draft of them (badge "Return code / status changed"). */
+    val draftChanged: Set<String> = emptySet(),
 ) {
     /** A chip row with nothing selected matches nothing (api §5) — no need to ask the server. */
     val nothingSelected: Boolean
@@ -59,6 +64,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val store = ServiceLocator.settings(app)
     private val api = ServiceLocator.api
     private val codeLists = ServiceLocator.codeLists(app)
+    private val drafts = ServiceLocator.drafts(app)
+    private val auth = ServiceLocator.auth(app)
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
     private var workJob: Job? = null
@@ -114,11 +121,21 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val rc = if (f == null || (ws.returnCodes.isEmpty() && f.returnCodes.isEmpty())) null else f.returnCodes
             when (val r = api.workList(url, pt, rc)) {
                 is ApiResult.Failure -> _state.update { it.copy(workList = it.workList.copy(loading = false, error = r.message)) }
-                is ApiResult.Ok -> _state.update {
-                    it.copy(workList = it.workList.copy(items = WorkListRules.sort(r.value.results), loading = false, error = null, loadedOnce = true))
+                is ApiResult.Ok -> {
+                    val (items, changed) = withDrafts(WorkListRules.sort(r.value.results))
+                    _state.update {
+                        it.copy(workList = it.workList.copy(items = items, draftChanged = changed, loading = false, error = null, loadedOnce = true))
+                    }
                 }
             }
         }
+    }
+
+    /** Spec §3.3: RMAs with a draft of the signed-in inspector stay listed, flagged, when they no longer match. */
+    private suspend fun withDrafts(items: List<RmaListItem>): Pair<List<RmaListItem>, Set<String>> {
+        val user = auth.session.value?.user ?: return items to emptySet()
+        val mine = withContext(Dispatchers.IO) { runCatching { drafts.list(user.username) }.getOrDefault(emptyList()) }
+        return WorkListDrafts.merge(items, mine)
     }
 
     fun search(text: String) {
