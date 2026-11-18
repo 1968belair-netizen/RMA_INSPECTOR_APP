@@ -1,10 +1,14 @@
-"""Mock RMA app server — implements docs/api.md (rev 6, SAP-ready) with in-memory FAKE data.
+"""Mock RMA app server — implements docs/api.md (rev 7) with in-memory FAKE data.
 
 Run:  python -m uvicorn mock_server.main:app --host 0.0.0.0 --port 8000
 The Android emulator reaches it at http://10.0.2.2:8000/api/v1
 
 The mock behaves like the Macola-era server: codes have group null, row ids are "L<n>.<signature>",
 there are no causes and three 4000-character summary blocks. Everything backend-specific stays in here.
+
+Sign-in (rev 7): POST /api/v1/auth/login with a FAKE demo user (demo / demo, or MOCK_USERS env JSON).
+Every other call needs "Authorization: Bearer <token>". Set MOCK_AUTH_OPTIONAL=1 to let app builds made
+before sign-in existed keep working (they send no token; X-Inspector is accepted instead).
 
 Test hooks (mock only, under /api/v1/_mock): reset, desk-edit (simulate a change elsewhere),
 lock, report-file-in-use.
@@ -14,7 +18,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
+import secrets
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -33,7 +39,25 @@ EASTERN = timezone(timedelta(hours=-5))
 PHOTO_MAX_BYTES = 10 * 1024 * 1024
 LIMITS = {"note": 4000, "inspected_by": 255, "summary_by": 255, "photo_tag_text": 40, "photo_max_bytes": PHOTO_MAX_BYTES}
 READ_ONLY_FIELDS = ("credit_status", "return_code", "failure_code", "failure_description", "comments")
-WORK_LIST_DEFAULT = ["Received", "Rework in Progress", "Inspected", "Report Complete"]
+SCROLL_BANNER = "Handled in the repair database. Scroll RMAs are read only in this app."
+AUTH_OPEN_PATHS = {"/api/v1/health", "/api/v1/auth/login"}
+
+
+def load_users() -> dict:
+    raw = os.environ.get("MOCK_USERS")
+    users = json.loads(raw) if raw else fd.DEFAULT_USERS
+    return {u.lower(): {"username": u, "display_name": v.get("display_name", u), "initials": v.get("initials", ""),
+                        "audit_user_id": u.upper() + "_SQL", "roles": ["all"], "password": v["password"]}
+            for u, v in users.items()}
+
+
+def auth_optional() -> bool:
+    return os.environ.get("MOCK_AUTH_OPTIONAL", "") in ("1", "true", "yes")
+
+
+def norm(text: Optional[str]) -> str:
+    """Server-side matching rule for settings (return codes, product types, statuses): trimmed, uppercase."""
+    return (text or "").strip().upper()
 FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64 + b"\xff\xd9"
 
 
@@ -112,6 +136,9 @@ class Store:
             self.replays: dict[str, tuple[int, dict]] = {}
             self.backups: list[dict] = []
             self.report_in_use: set[str] = set()
+            self.users = load_users()
+            self.tokens: dict[str, str] = {}          # token -> username (no expiry: signed in until sign-out)
+            self.dictionary: set[str] = set()         # words added via "Add to dictionary"
             r = self.rmas["912347"]
             for name in ("00-1 As received.jpg", "01-1 Stator - 46 Burnt.jpg",
                          "02-1 Winding to ground insulation - 38 Ground fault.jpg"):
@@ -200,15 +227,24 @@ def summary_view(rma: dict) -> dict:
 def header_view(rma: dict) -> dict:
     h = dict(rma["header"])
     h["inspection_status"] = status_obj(h["inspection_status"])
+    h["return_code"] = return_code_obj(h["return_code"])
     return h
+
+
+def return_code_obj(text: str) -> Optional[dict]:
+    t = (text or "").strip()
+    return {"group": None, "code": t, "description": t} if t else None
 
 
 def list_item(rma: dict) -> dict:
     key, _ = product_key(rma)
     return {"rma_id": rma["rma_id"], "display_number": rma["display_number"], "model": rma["header"]["model"],
             "failed_serial_no": rma["header"]["failed_serial_no"], "product_type": rma["product_type"],
-            "product_type_key": key, "inspection_status": status_obj(rma["header"]["inspection_status"]),
-            "is_open": rma["is_open"], "inspectable": rma["inspectable"], "locked": rma["lock"]["locked"]}
+            "product_type_key": key, "return_code": return_code_obj(rma["header"]["return_code"]),
+            "inspection_status": status_obj(rma["header"]["inspection_status"]),
+            "status_since": rma["status_since"], "status_since_estimated": rma["status_since_estimated"],
+            "flags": rma["flags"], "is_open": rma["is_open"], "inspectable": rma["inspectable"],
+            "locked": rma["lock"]["locked"]}
 
 
 def detail(rma: dict) -> dict:
@@ -218,23 +254,30 @@ def detail(rma: dict) -> dict:
         "loaded_at": now(), "is_open": rma["is_open"], "inspectable": rma["inspectable"],
         "product_type": rma["product_type"], "product_type_key": key, "product_type_source": source,
         "capabilities": rma_capabilities(rma), "header": header_view(rma),
+        "status_since": rma["status_since"], "status_since_estimated": rma["status_since_estimated"],
+        "flags": rma["flags"],
         "lock": {**rma["lock"], "checked_at": now()}, "parts": parts_view(rma), "summary": summary_view(rma),
         "photos": {"folder_found": rma["folder_exists"], "folder_display": folder_display(rma, "All Pics"),
                    "count": len(rma["all_pics"]), "files": naming.natural_sorted(rma["all_pics"])},
     }
 
 
-def require_inspector(x_inspector: Optional[str]) -> dict:
-    for i in fd.INSPECTORS:
-        if x_inspector and i["username"].lower() == x_inspector.lower():
-            return i
-    raise ApiError(403, "UNKNOWN_INSPECTOR", "This inspector isn't on the server's list. Pick the inspector again.")
+def signed_in_user(request: Request) -> dict:
+    """The user from the bearer token (set by the auth middleware)."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise ApiError(401, "UNAUTHENTICATED", "Please sign in again.")
+    return user
+
+
+def public_user(u: dict) -> dict:
+    return {k: u[k] for k in ("username", "display_name", "initials", "audit_user_id", "roles")}
 
 
 def require_capability(rma: dict, cap: str):
     key, _ = product_key(rma)
     if not capabilities_for(key)[cap]:
-        raise ApiError(403, "PRODUCT_TYPE_NOT_ENABLED", "Scroll inspections are recorded in the Access repair DB.",
+        raise ApiError(403, "PRODUCT_TYPE_NOT_ENABLED", SCROLL_BANNER,
                        details={"product_type_key": key, "capability": cap})
 
 
@@ -307,6 +350,23 @@ async def _api_error(_: Request, e: ApiError):
     return JSONResponse(error_body(e), status_code=e.status, headers=headers)
 
 
+@app.middleware("http")
+async def _auth(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/v1/") and path not in AUTH_OPEN_PATHS and not path.startswith("/api/v1/_mock/"):
+        header = request.headers.get("authorization", "")
+        token = header[7:].strip() if header.lower().startswith("bearer ") else ""
+        username = store.tokens.get(token) if token else None
+        user = store.users.get(username) if username else None
+        if user is None and auth_optional():
+            legacy = (request.headers.get("x-inspector") or "").lower()
+            user = store.users.get(legacy) or next(iter(store.users.values()))
+        if user is None:
+            return JSONResponse(error_body(ApiError(401, "UNAUTHENTICATED", "Please sign in.")), status_code=401)
+        request.state.user = user
+    return await call_next(request)
+
+
 @app.exception_handler(RequestValidationError)
 async def _bad_request(_: Request, e: RequestValidationError):
     return JSONResponse(error_body(ApiError(400, "BAD_REQUEST", "The request was malformed.",
@@ -321,9 +381,34 @@ def health():
             "photo_store_reachable": True, "server_time": now()}
 
 
+@api.post("/auth/login")
+async def login(request: Request):
+    body = await request.json()
+    user = store.users.get(str(body.get("username", "")).strip().lower())
+    if not user or not secrets.compare_digest(str(body.get("password", "")), user["password"]):
+        raise ApiError(401, "INVALID_CREDENTIALS", "Wrong username or password.")
+    token = secrets.token_urlsafe(32)
+    store.tokens[token] = user["username"].lower()
+    return {"token": token, "expires_at": None, "user": public_user(user)}
+
+
+@api.post("/auth/logout", status_code=204)
+def logout(request: Request):
+    header = request.headers.get("authorization", "")
+    store.tokens.pop(header[7:].strip(), None)
+    return Response(status_code=204)
+
+
+@api.get("/me")
+def me(request: Request):
+    return public_user(signed_in_user(request))
+
+
 @api.get("/inspectors")
-def inspectors():
-    return {"inspectors": fd.INSPECTORS, "max_inspectors": 10, "sign_in_required": False}
+def inspectors_deprecated(request: Request):
+    """Deprecated (rev 7): kept only so app builds from before sign-in still start. Removed with the sign-in issue."""
+    u = public_user(signed_in_user(request))
+    return {"inspectors": [u], "max_inspectors": 10, "sign_in_required": True}
 
 
 def _codelists() -> dict:
@@ -341,9 +426,17 @@ def _codelists() -> dict:
         "product_types": [{"value": v, "key": k, "capabilities": capabilities_for(k)} for v, k in fd.PRODUCT_TYPES],
         "hidden": {"parts": [], "issues": [], "causes": []},
         "photo_tags": fd.PHOTO_TAGS,
-        "work_list_statuses": [{"group": None, "code": s} for s in WORK_LIST_DEFAULT],
+        "return_codes": [{"group": None, "code": c, "description": c} for c in fd.RETURN_CODES],
+        "work_list_statuses": [{"group": None, "code": s} for s in fd.WORK_LIST_STATUSES],
+        "work_list_product_types": fd.WORK_LIST_PRODUCT_TYPES,
+        "work_list_return_codes": [{"group": None, "code": c} for c in fd.WORK_LIST_RETURN_CODES],
+        "status_roles": {"inspected": "Inspected", "report_complete": "Report Complete",
+                         "report_sent": ["Sent to RSM", "Issued to Customer"]},
+        "normal_issue_codes": [{"group": None, "code": "50"}],
+        "checklists": {},
         "photo": {"max_edge_px": 2048, "jpeg_quality": 85},
-        "report": {"typical_photo_count": 20, "max_photo_count": None, "auto_status_after_report": None},
+        "report": {"typical_photo_count": 20, "max_photo_count": None, "photos_per_page": 6, "fixed_pages": 2,
+                   "auto_status_after_report": "Report Complete"},
         "summary_template": fd.SUMMARY_TEMPLATE,
         "limits": LIMITS,
     }
@@ -373,14 +466,26 @@ def search(q: str):
     return {"query": q, "matched_on": matched_on, "results": results}
 
 
+def _csv_codes(value: Optional[str]) -> Optional[set]:
+    """'a,b' or 'group:code' -> set of normalised codes; None when the parameter is absent."""
+    if value is None:
+        return None
+    return {norm(v.split(":", 1)[-1]) for v in value.split(",") if v.strip()}
+
+
 @api.get("/rmas")
-def work_list(inspection_status: Optional[str] = None, limit: int = 50):
-    if inspection_status:
-        wanted = [s.split(":", 1)[-1].strip() for s in inspection_status.split(",")]  # "group:code" or "code"
-    else:
-        wanted = WORK_LIST_DEFAULT
-    rows = [r for r in store.rmas.values() if r["is_open"] and r["inspectable"] and r["header"]["inspection_status"] in wanted]
-    rows.sort(key=lambda r: (r["last_act_dt"], r["rma_id"]), reverse=True)
+def work_list(product_type: Optional[str] = None, return_code: Optional[str] = None, limit: int = 200):
+    """Work list (decision 2026-11-18): open + inspectable RMAs at the configured statuses (Received),
+    filtered by product type and return code (defaults = server settings), oldest status_since first."""
+    statuses = {norm(s) for s in fd.WORK_LIST_STATUSES}
+    types = _csv_codes(product_type) if product_type is not None else {norm(t) for t in fd.WORK_LIST_PRODUCT_TYPES}
+    codes = _csv_codes(return_code) if return_code is not None else {norm(c) for c in fd.WORK_LIST_RETURN_CODES}
+    rows = [r for r in store.rmas.values()
+            if r["is_open"] and r["inspectable"]
+            and norm(r["header"]["inspection_status"]) in statuses
+            and norm(r["product_type"]) in types
+            and norm(r["header"]["return_code"]) in codes]
+    rows.sort(key=lambda r: (r["status_since"], r["display_number"]))
     return {"results": [list_item(r) for r in rows[:limit]], "generated_at": now()}
 
 
@@ -451,22 +556,20 @@ def _validate_parts(parts: list, valid_ids: Optional[set], errors: list):
 
 
 @api.post("/rmas/{rma_id}/inspection")
-async def submit_inspection(rma_id: str, request: Request, x_inspector: Optional[str] = Header(default=None)):
+async def submit_inspection(rma_id: str, request: Request):
     body: dict[str, Any] = await request.json()
     with store.lock:
         hit = replay(body.get("submission_id"))
         if hit:
             return JSONResponse(hit[1], status_code=hit[0])
         rma = get_rma(rma_id)
-        inspector = require_inspector(x_inspector)
+        signed_in_user(request)  # identity comes from the token; the audit user is built server-side
         current_sig = record_signature(rma)
         base_matches = body.get("base_signature") == current_sig
 
         errors: list[dict] = []
         if not body.get("submission_id"):
             errors.append(field_error("submission_id", "REQUIRED", "submission_id is required."))
-        if (body.get("inspector") or "").lower() != inspector["username"].lower():
-            errors.append(field_error("inspector", "INSPECTOR_MISMATCH", "Inspector doesn't match X-Inspector."))
         summary = body.get("summary")
         for f in READ_ONLY_FIELDS:
             if f in body or f in (summary or {}):
@@ -553,8 +656,8 @@ async def submit_inspection(rma_id: str, request: Request, x_inspector: Optional
 # --- photos
 
 @api.post("/rmas/{rma_id}/photos", status_code=201)
-async def upload_photo(rma_id: str, response: Response, meta: str = Form(...), file: UploadFile = File(...),
-                       x_inspector: Optional[str] = Header(default=None)):
+async def upload_photo(rma_id: str, request: Request, response: Response, meta: str = Form(...),
+                       file: UploadFile = File(...)):
     m = json.loads(meta)
     with store.lock:
         hit = replay(m.get("photo_id"))
@@ -562,7 +665,7 @@ async def upload_photo(rma_id: str, response: Response, meta: str = Form(...), f
             response.status_code = 200
             return hit[1]
         rma = get_rma(rma_id)
-        require_inspector(x_inspector)
+        signed_in_user(request)
         require_capability(rma, "photos")
         data = await file.read()
         if file.content_type != "image/jpeg" or not data.startswith(b"\xff\xd8"):
@@ -599,6 +702,10 @@ async def upload_photo(rma_id: str, response: Response, meta: str = Form(...), f
         else:
             name = naming.rma_photo(n, m["tag"], m.get("tag_text"))
         rma["all_pics"].append(name)
+        rma.setdefault("photo_meta", {})[name] = {
+            "seq": seq, "row_id": m.get("row_id"),
+            "part_code": (None if m["kind"] != "part" else {"group": m["part_code"].get("group"), "code": m["part_code"]["code"]}),
+        }
         store.files[(rma["rma_id"], "all", name)] = data
         result = {"photo_id": m.get("photo_id"), "replayed": False, "filename": name,
                   "folder_display": folder_display(rma, "All Pics"), "folder_created": folder_created,
@@ -612,7 +719,12 @@ def list_photos(rma_id: str):
     rma = get_rma(rma_id)
 
     def entry(folder, name):
-        return {"filename": name, "bytes": len(store.files.get((rma["rma_id"], folder, name), b"")), "modified": now()}
+        # Part association lets the Report tab filter the photo strip by part (decision 2026-11-18).
+        meta = rma.get("photo_meta", {}).get(name, {})
+        m = re.match(r"^(\d+)-\d+\b", name)
+        return {"filename": name, "bytes": len(store.files.get((rma["rma_id"], folder, name), b"")), "modified": now(),
+                "seq": meta.get("seq", int(m.group(1)) if m else None),
+                "part_code": meta.get("part_code"), "row_id": meta.get("row_id")}
     return {"folder_found": rma["folder_exists"], "folder_display": folder_display(rma),
             "all_pics": [entry("all", n) for n in naming.natural_sorted(rma["all_pics"])],
             "report_pics": {"folder_found": rma["report_folder_exists"], "signature": report_pics_signature(rma),
@@ -632,14 +744,14 @@ def get_photo(rma_id: str, folder: str, filename: str, size: str = "full"):
 # --- report photos
 
 @api.put("/rmas/{rma_id}/report-pics")
-async def put_report_pics(rma_id: str, request: Request, x_inspector: Optional[str] = Header(default=None)):
+async def put_report_pics(rma_id: str, request: Request):
     body = await request.json()
     with store.lock:
         hit = replay(body.get("submission_id"))
         if hit:
             return JSONResponse(hit[1], status_code=hit[0])
         rma = get_rma(rma_id)
-        require_inspector(x_inspector)
+        signed_in_user(request)
         require_capability(rma, "report")
         current = report_pics_signature(rma)
         if body.get("base_signature") != current:
@@ -722,14 +834,14 @@ def _fake_pdf(title: str, pages: int) -> bytes:
 
 
 @api.post("/rmas/{rma_id}/report")
-async def build_report(rma_id: str, request: Request, x_inspector: Optional[str] = Header(default=None)):
+async def build_report(rma_id: str, request: Request):
     body = await request.json()
     with store.lock:
         hit = replay(body.get("submission_id"))
         if hit:
             return JSONResponse(hit[1], status_code=hit[0])
         rma = get_rma(rma_id)
-        require_inspector(x_inspector)
+        signed_in_user(request)
         require_capability(rma, "report")
         require_open(rma)
         num = rma["display_number"]
@@ -751,10 +863,23 @@ async def build_report(rma_id: str, request: Request, x_inspector: Optional[str]
         pdf = _fake_pdf(f"MOCK REPORT RMA {num}", pages)
         previous = rma["report"] is not None
         rma["report"] = {"generated_at": now(), "pdf": pdf, "pages": pages, "xlsx_bytes": 8800}
+        # First successful build sets Report Complete (audited); later builds only regenerate (decision 2026-11-18).
+        status_changed = None
+        order = fd.INSPECTION_STATUSES
+        current = rma["header"]["inspection_status"]
+        if current in order and order.index(current) < order.index("Report Complete"):
+            status_changed = {"from": {"group": None, "code": current}, "to": {"group": None, "code": "Report Complete"},
+                              "audited": True}
+            rma["header"]["inspection_status"] = "Report Complete"
+            rma["status_since"] = datetime.now(EASTERN).date().isoformat()
+            rma["status_since_estimated"] = False
+        elif current in fd.REPORT_SENT_STATUSES:
+            warnings.append({"code": "REPORT_ALREADY_SENT",
+                             "message": "This report was already sent. It has been regenerated; you may need to resend it."})
         result = {"result": "built", "replayed": False, "generated_at": rma["report"]["generated_at"],
                   "files": [{"format": "pdf", "filename": f"{num} Report.pdf", "bytes": len(pdf), "pages": pages},
                             {"format": "xlsx", "filename": f"{num} Report.xlsx", "bytes": 8800}],
-                  "photo_count": photo_count, "previous_backed_up": previous, "status_changed": None,
+                  "photo_count": photo_count, "previous_backed_up": previous, "status_changed": status_changed,
                   "warnings": warnings}
         remember(body.get("submission_id"), 200, result)
         return result
@@ -787,8 +912,20 @@ MISSPELLINGS = {"scorring": ["scoring"], "compresser": ["compressor"], "bearring
 async def spellcheck(request: Request):
     text = (await request.json()).get("text", "")
     issues = [{"word": m.group(0), "start": m.start(), "end": m.end(), "suggestions": MISSPELLINGS[m.group(0).lower()]}
-              for m in re.finditer(r"[A-Za-z]+", text) if m.group(0).lower() in MISSPELLINGS]
+              for m in re.finditer(r"[A-Za-z]+", text)
+              if m.group(0).lower() in MISSPELLINGS and m.group(0).lower() not in store.dictionary]
     return {"issues": issues}
+
+
+@api.post("/spellcheck/dictionary", status_code=201)
+async def add_to_dictionary(request: Request):
+    """Add a word to the shared dictionary (Macola era: the workbench's rma_tools_dictionary.txt)."""
+    word = str((await request.json()).get("word", "")).strip()
+    if not word or not re.fullmatch(r"[A-Za-z][A-Za-z'\-]{0,48}", word):
+        raise ApiError(422, "VALIDATION_FAILED", "That isn't a single word.",
+                       details={"fields": [field_error("word", "BAD_WORD", "Send one word.")]})
+    store.dictionary.add(word.lower())
+    return {"word": word, "added": True}
 
 
 # --- mock-only test hooks

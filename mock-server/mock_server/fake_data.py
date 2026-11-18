@@ -3,16 +3,22 @@
 Code lists are a representative subset of the Macola lookup tables (reference text, not customer data);
 the real server serves the full live lists.
 
-Fake RMAs (each exercises a path in docs/api.md):
-  912345  Recip, Received, normal happy path (no summary row yet, no folder yet)
-  912346  Screw, Received, OPEN IN MACOLA by another user            -> 423 RMA_LOCKED
-  912347  Recip, Inspected, has parts + summary + report photos       -> use /_mock hooks for conflicts
-  912348  Scroll                                                      -> capabilities all false (403)
-  912349  Recip, closed                                               -> 409 RMA_NOT_OPEN
-  912350  Blank product type, scroll model prefix                     -> derived scroll (read-only)
-  912351  Blank product type, unknown model                           -> "unknown", full access
-  912352  Part, Received, lock table unreadable                       -> 503 LOCK_CHECK_FAILED
-  912353  Transport, Report Complete, credit status FD (no letter text)
+Fake RMAs (each exercises a path in docs/api.md). "WL" = on the default work list.
+  912345  Recip, Warranty, Received 23 d — happy path (no summary yet, no folder yet)          WL
+  912346  Screw, Warranty, Received 41 d, OPEN ELSEWHERE -> 423 RMA_LOCKED                    WL (oldest)
+  912347  Recip, Inspection Only, Inspected — parts + summary + report photos                 (not Received)
+  912348  Scroll, Warranty, Received 30 d -> read-only (scroll capability off)               WL
+  912349  Recip, closed -> 409 RMA_NOT_OPEN
+  912350  Blank product type (scroll model), blank return code, Received -> not on the list
+  912351  Blank product type, Core Credit, Received -> not on the list
+  912352  Part, Repair & Return, Received 19 d (date estimated), lock check fails -> 503       WL
+  912353  Transport, Freight Damage, Report Complete, credit status FD (no letter text)
+  912354  Recip, Core&Inspection, Received, core-teardown badge -> not on the list (return code)
+  912355  Screw, Repair & Return, Received 12 d, core-teardown badge                          WL
+  912356  Pressure Vessel, Warranty, Received -> not on the default list (product type)
+  912357  Recip, Inspection Only, Received 5 d                                                WL
+  912358  Recip, Inspection Only, Report Complete — report already built (resubmit warning)
+  912359  Screw, Warranty, Sent to RSM — report already sent (resubmit warning)
 """
 from __future__ import annotations
 
@@ -69,9 +75,23 @@ PRODUCT_TYPES = [
 SCROLL_PREFIXES = ("GSD", "GTD", "GUD", "ELH", "ELV", "ELA", "ESH")
 SCREW_PREFIXES = ("CHS", "CS", "HS", "OS")
 
-INSPECTORS = [
-    {"username": "jdoe", "display_name": "J. Doe", "initials": "JD", "audit_user_id": "JDOE_SQL"},
+RETURN_CODES = [
+    "Warranty", "Repair & Return", "Core Credit", "New & Unused", "Inspection Only", "Core Buyback",
+    "Freight Damage", "Cus Line Reject", "Core&Inspection",
 ]
+
+# Work-list settings (server config; decision 2026-11-18). Matched trimmed + uppercase.
+WORK_LIST_STATUSES = ["Received"]
+WORK_LIST_PRODUCT_TYPES = ["Recip", "Scroll", "Screw", "Part"]
+WORK_LIST_RETURN_CODES = ["Inspection Only", "Repair & Return", "Warranty"]
+REPORT_SENT_STATUSES = ["Sent to RSM", "Issued to Customer"]
+
+# Mock sign-in users — FAKE demo credentials for local testing only. Override with the MOCK_USERS
+# environment variable (JSON: {"user": {"password": "...", "display_name": "...", "initials": "..."}}).
+# The real server keeps its users in a server-side setting, never in the repo.
+DEFAULT_USERS = {
+    "demo": {"password": "demo", "display_name": "Demo Inspector", "initials": "DI"},
+}
 
 SUMMARY_TEMPLATE = (
     "The primary failure mode is the [ ] of the [ ] likely due to [ ]. Failure progression resulted in [ ]. "
@@ -98,7 +118,7 @@ def _empty_summary():
 
 def _rma(rma, *, model, serial, product_type, status, is_open=True, credit="", failure_code="",
          failure_description="", comments="", parts=None, summary=None, lock=None, lock_check_fails=False,
-         return_code="Warranty"):
+         return_code="Warranty", status_since="2026-11-10", estimated=False, flags=None):
     return {
         "rma_id": rma,
         "display_number": rma,
@@ -126,30 +146,62 @@ def _rma(rma, *, model, serial, product_type, status, is_open=True, credit="", f
         "all_pics": [],
         "report_pics": [],
         "report": None,
-        "last_act_dt": "2026-11-10",
+        "last_act_dt": status_since,
+        # Date of the last real status change (Old_Status <> New_Status; tiebreak A4glidentity).
+        # No audit rows -> rma_dt_entered with estimated = True (Trend Tracker rule).
+        "status_since": status_since,
+        "status_since_estimated": estimated,
+        "flags": flags or [],
     }
+
+
+CORE_TEARDOWN = {"code": "CORE_TEARDOWN", "label": "In core teardown log"}
 
 
 def initial_rmas() -> dict:
     rmas = [
         _rma("912345", model="4FE-28Y", serial="25X0000001", product_type="Recip", status="Received",
              failure_code="9-Oil Issue", failure_description="Example: low oil pressure trips reported",
-             comments="Example: customer reports repeated trips",
+             comments="Example: customer reports repeated trips", status_since="2026-10-26",
              parts=[row("07a", "50"), row("48a", "50", "Within spec, all 3 phases")]),
         _rma("912346", model="HSN7471-75", serial="25X0000002", product_type="Screw", status="Received",
+             status_since="2026-10-08",
              lock={"locked": True, "held_by": "JDOE2", "host": "EXAMPLE-PC", "possibly_stale": False}),
         _rma("912347", model="4PE-15Y", serial="25X0000003", product_type="Recip", status="Inspected",
+             return_code="Inspection Only", status_since="2026-11-09",
              credit="F - Full Warranty Credit", failure_code="2-Motor Grounded",
              parts=[row("44", "46", "Example note"), row("48", "38")],
              summary={"exists": True, "defect_code": code("07"),
                       "blocks": {"1": "Example summary text."},
                       "inspected_by": "JD", "summary_by": "JD"}),
-        _rma("912348", model="GSD60235VAB", serial="25X0000004", product_type="Scroll", status="Received"),
+        _rma("912348", model="GSD60235VAB", serial="25X0000004", product_type="Scroll", status="Received",
+             status_since="2026-10-19"),
         _rma("912349", model="4FE-28Y", serial="25X0000005", product_type="Recip", status="Closed", is_open=False),
-        _rma("912350", model="GTD80295", serial="25X0000006", product_type="", status="Received"),
-        _rma("912351", model="EXAMPLE-MODEL", serial="25X0000007", product_type="", status="Received"),
-        _rma("912352", model="PART-0001", serial="", product_type="Part", status="Received", lock_check_fails=True),
+        _rma("912350", model="GTD80295", serial="25X0000006", product_type="", status="Received", return_code=""),
+        _rma("912351", model="EXAMPLE-MODEL", serial="25X0000007", product_type="", status="Received",
+             return_code="Core Credit"),
+        _rma("912352", model="PART-0001", serial="", product_type="Part", status="Received",
+             return_code="Repair & Return", status_since="2026-10-30", estimated=True, lock_check_fails=True),
         _rma("912353", model="4NFC-20Y", serial="25X0000008", product_type="Transport", status="Report Complete",
              credit="FD - Freight Damage", return_code="Freight Damage"),
+        _rma("912354", model="4FE-35Y", serial="25X0000009", product_type="Recip", status="Received",
+             return_code="Core&Inspection", status_since="2026-10-15", flags=[CORE_TEARDOWN]),
+        _rma("912355", model="CSH6553-50Y", serial="25X0000010", product_type="Screw", status="Received",
+             return_code="Repair & Return", status_since="2026-11-06", flags=[CORE_TEARDOWN]),
+        _rma("912356", model="PV-EXAMPLE", serial="25X0000011", product_type="Pressure Vessel", status="Received",
+             status_since="2026-10-01"),
+        _rma("912357", model="2KES-05Y", serial="25X0000012", product_type="Recip", status="Received",
+             return_code="Inspection Only", status_since="2026-11-13",
+             parts=[row("34", "22", "Dark oil")]),
+        _rma("912358", model="4JE-22Y", serial="25X0000013", product_type="Recip", status="Report Complete",
+             return_code="Inspection Only", status_since="2026-11-03", credit="I/N - Inspection (No CC)",
+             parts=[row("63", "34")],
+             summary={"exists": True, "defect_code": code("10"), "blocks": {"1": "Example summary text."},
+                      "inspected_by": "JD", "summary_by": "JD"}),
+        _rma("912359", model="HSK7451-60", serial="25X0000014", product_type="Screw", status="Sent to RSM",
+             status_since="2026-10-28", credit="F - Full Warranty Credit",
+             parts=[row("81", "34")],
+             summary={"exists": True, "defect_code": code("14"), "blocks": {"1": "Example summary text."},
+                      "inspected_by": "JD", "summary_by": "JD"}),
     ]
     return copy.deepcopy({r["rma_id"]: r for r in rmas})

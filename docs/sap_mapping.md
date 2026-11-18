@@ -1,6 +1,6 @@
 # SAP mapping — API field → Macola source → expected SAP object/field
 
-_Draft 2026-11-17, written with `docs/api.md` rev 6. Purpose: show the SAP team exactly what the tablet needs, so
+_Draft 2026-11-17 (updated 2026-11-18 for `docs/api.md` rev 7). Purpose: show the SAP team exactly what the tablet needs, so
 the SAP S/4HANA cutover changes only the server's backend connector. Nothing here has been checked against
 BITZER's SAP design — no SAP system, field mapping or OData service has been touched yet (context pack 03 §7)._
 
@@ -37,6 +37,10 @@ S/4HANA OData entity/property names the server would actually call must be confi
 | `signature` | Workbench snapshot signature over header + summary + parts | OData ETag / notification last-changed timestamp, plus a content hash | Proposed |
 | `header.inspection_status` (code object) | `OERMAHDR_iPro.RMA_Inspection_Status` (text; list from `oermactl_ipro`) | User status (status profile on the notification type, table JEST/TJ30T) — `group` could carry the status profile | Proposed (A3) |
 | `status_change` audit | `OERMAAUD_iPro` row (`UserID` = `<USER>_SQL`) | SAP status change history (JCDS) / change documents (CDHDR/CDPOS) under the inspector's own SAP user | Proposed — needs per-inspector identity |
+| `status_since` / `status_since_estimated` | Latest `OERMAAUD_iPro.DateTimeOfChange` for `RMA_Inspection_Status` where Old ≠ New (tiebreak `A4glidentity`); else `rma_dt_entered`, estimated | Status change date from status history (JCDS) for the user status | Proposed |
+| `return_code` (code object; work-list filter) | `OERMAHDR_iPro.Return_Code` CHAR(15), trimmed | Returns order reason (AUGRU) or custom field — `work_list_return_codes` re-pointed at cutover | **Unknown** |
+| `flags` (`CORE_TEARDOWN`) | Core Teardown Log cache (separate team's workbook) | Unknown — depends on where core processing lives in SAP | **Unknown** |
+| Sign-in user → `audit_user_id` | Server user list → `<USERNAME>_SQL` | The inspector's own SAP user | Proposed — needs per-user SAP auth |
 | Search by serial (`q`) | `OERMAHDR_iPro.Failed_Serial_No`, `rma_cmt` | Notification serial number field / returns order item serial | Proposed |
 | Work list filter | `RMA_Inspection_Status` values | User status selection | Proposed |
 

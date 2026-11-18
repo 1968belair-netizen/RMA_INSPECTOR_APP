@@ -3,6 +3,85 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Layout and behaviour decisions (Jacob) — spec rev 7, api rev 7
+Layout/behaviour only; built in later issues. **Supersedes:** "no sign-in in v1", "no barcode in v1", the inspector
+picker, the separate Summary screen/tab, the status-chip work list and its old defaults (Received / Rework /
+Inspected / Report Complete), "status stays manual after a report build", and "add to dictionary is a desk action".
+
+**Goal**
+- The inspector does the whole inspection **and** report in the app; report writing follows right after the
+  inspection. Windows workbench updates come later.
+- All sign-ins have all functions in v1 (`roles: ["all"]`); roles later.
+
+**Sign-in**
+- First screen: username + password checked by the server (`POST /auth/login` → token). v1 credentials are a server
+  setting (mock: fake demo user). No credentials in the app or repo. Replaces the inspector picker. Stays signed in
+  until the user signs out. `GET /inspectors` removed (mock keeps it only until the sign-in screen ships).
+
+**Find an RMA**
+- One search box (RMA, serial or SAP no.; server decides) with a camera icon: ML Kit on-device barcode/QR scanning
+  plus text recognition for serials; the result fills the box and runs the search. One match → open; several → list.
+- Results and work list show RMA, model, product type, return code, age (`status_since` + "estimated"), status,
+  core-teardown and lock badges. Work list sits below the search box.
+
+**Work list**
+- Inspection status **Received** only.
+- Filter chips for product type and return code; the tablet remembers the last selection.
+- Defaults: product types Recip, Scroll, Screw, Part; return codes Inspection Only, Repair & Return, Warranty.
+- Defaults and allowed values are server settings (`work_list_statuses`, `work_list_product_types`,
+  `work_list_return_codes`; chips offer `product_types` / `return_codes`), matched trimmed/uppercase, so they can
+  change at the SAP rollout without an app update.
+- Scroll RMAs appear but open read-only with the "Handled in the repair database" banner (scroll capability off).
+- Sort: oldest `status_since` first, then RMA number.
+- `status_since` counts only real status changes (`Old_Status <> New_Status`), tiebreak `A4glidentity`; no audit
+  rows → `rma_dt_entered` with `status_since_estimated = true`.
+- Open = combined view `status='O'` JOIN `OERMAHDR_iPro` (same as the Trend Tracker). An RMA with a draft on this
+  tablet stays on its list even if it no longer matches the filters, with a "Return code / status changed" flag.
+- Phase 4 (local session): extract the Trend Tracker queries into a side-effect-free `rma_queries.py` shared by
+  `daily_snapshot_V4.py`, `refresh_aging_data.py` and the app server.
+
+**Inspection workspace**
+- Persistent header: RMA, model, product type, return code, status, customer, serial; expandable failure info.
+- Tabs: Findings, Photos, Report. Landscape two panes (list + detail); portrait list → detail. Target 11"+ tablets.
+- Part detail opens as a sheet over Findings. "Add part" always visible. (Replaces the separate RMA overview screen.)
+
+**Guided inspection**
+- Header button: Start / Continue (step x of y) / Complete / disabled "No guided list for <type> yet" (v1: no
+  checklists).
+- Server-served checklists per product type in `/codelists` (`checklists` keyed by `product_type_key`; empty in v1):
+  part code + photo rules (`required_when`: always / non_normal / never; `normal_issue_codes` = `50`). Future grid:
+  required part + 50 Normal → overall photo required; non-normal → overall + detail required.
+- Each step: part code, issue code as a searchable scrollable dropdown defaulting to 50 Normal (no chip grid),
+  optional note, photo slots with Required/Optional badges. Skip disabled for required photos; Next disabled until
+  required items are done. Steps write into Findings; resumable; existing rows pre-filled.
+- Finish → "Inspection complete" dialog → back to the workspace.
+- Required items apply only in guided mode; manual entry has no requirements.
+
+**Submit inspection** (Findings / Photos tabs; review screen first; `status_roles` from the server)
+- Status before Inspected → save findings/photos, set Inspected.
+- Status Report Complete → dialog "Report already complete" with "Update inspection findings": saves, keeps the
+  status, regenerates the report.
+- Status Sent to RSM or Issued to Customer → same, with warning "This report was already sent. Updating will
+  regenerate it; you may need to resend it."
+
+**Report tab**
+- Landscape: left = parts list (part, issue, note) + photo strip filtered by the selected part (Show all, tap to
+  enlarge, long-press to add to report); right = General Defect Code dropdown, summary (standard wording button,
+  counter), Inspected by / Summary by, "Report photos: n picked, n pages" → Arrange (captions, caption order). Must
+  stay usable with the on-screen keyboard open.
+- Submit report: automatic spell check (flagged words with suggestions: fix, ignore, add to dictionary — new
+  `POST /spellcheck/dictionary`) → build PDF/XLSX → preview. First time sets Report Complete; afterwards it only
+  regenerates (same warnings as above when past Report Complete).
+- Photo list carries `seq` / `part_code` / `row_id` so the strip can filter by part.
+
+**References** (check licenses; reference first): android/architecture-samples (main template),
+android/nowinandroid, android/camera-samples, googlesamples/mlkit, android/compose-samples,
+ReactiveCircus/android-emulator-runner. Field Report Pro for ideas only unless licensed.
+
+**Mock server:** fake demo sign-in (`demo`/`demo`, overridable via `MOCK_USERS`); `MOCK_AUTH_OPTIONAL=1` keeps
+pre-sign-in app builds working (set in `run_mock_server.bat` until the sign-in issue merges); new fake RMAs
+912354–912359 for the filters, badges and report-status paths.
+
 ## 2026-11-17 — One report summary
 - The app has **one** summary field, "Report summary" (≤ 4000). It is a server setting (`summary_blocks` in
   `/codelists`), not app code. Macola: stored in `oermahdr_extended_ipro.summary_1`; `summary_2` / `summary_3`

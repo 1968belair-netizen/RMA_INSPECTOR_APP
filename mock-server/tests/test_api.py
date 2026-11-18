@@ -51,11 +51,45 @@ def test_search_takes_any_text_server_decides(client):
         assert r.status_code == 200 and r.json()["results"] == []
 
 
-def test_work_list_default_and_any_status(client):
-    default = {r["rma_id"] for r in client.get("/api/v1/rmas").json()["results"]}
-    assert "912345" in default and "912353" in default and "912349" not in default
-    only = client.get("/api/v1/rmas", params={"inspection_status": "Report Complete"}).json()["results"]
-    assert [r["rma_id"] for r in only] == ["912353"]
+def test_sign_in_required_and_token_lifecycle(anon):
+    assert anon.get("/api/v1/health").status_code == 200
+    r = anon.get("/api/v1/codelists")
+    assert r.status_code == 401 and r.json()["error"]["code"] == "UNAUTHENTICATED"
+    bad = anon.post("/api/v1/auth/login", json={"username": "demo", "password": "nope"})
+    assert bad.status_code == 401 and bad.json()["error"]["code"] == "INVALID_CREDENTIALS"
+    ok = anon.post("/api/v1/auth/login", json={"username": "DEMO", "password": "demo", "device_id": "t"}).json()
+    assert ok["expires_at"] is None and ok["user"]["roles"] == ["all"] and ok["user"]["audit_user_id"] == "DEMO_SQL"
+    h = {"Authorization": "Bearer " + ok["token"]}
+    assert anon.get("/api/v1/me", headers=h).json()["username"] == "demo"
+    assert anon.post("/api/v1/auth/logout", headers=h).status_code == 204
+    assert anon.get("/api/v1/me", headers=h).status_code == 401
+
+
+def test_work_list_received_only_filtered_and_oldest_first(client):
+    cl = client.get("/api/v1/codelists").json()
+    assert [s["code"] for s in cl["work_list_statuses"]] == ["Received"]
+    assert cl["work_list_product_types"] == ["Recip", "Scroll", "Screw", "Part"]
+    assert [c["code"] for c in cl["work_list_return_codes"]] == ["Inspection Only", "Repair & Return", "Warranty"]
+    assert cl["checklists"] == {} and cl["normal_issue_codes"] == [{"group": None, "code": "50"}]
+    rows = client.get("/api/v1/rmas").json()["results"]
+    # Default filters: Received + Recip/Scroll/Screw/Part + IO/R&R/Warranty; oldest status_since first.
+    assert [r["rma_id"] for r in rows] == ["912346", "912348", "912345", "912352", "912355", "912357"]
+    first = rows[0]
+    assert first["return_code"] == {"group": None, "code": "Warranty", "description": "Warranty"}
+    assert first["status_since"] == "2026-10-08" and first["status_since_estimated"] is False and first["locked"]
+    est = next(r for r in rows if r["rma_id"] == "912352")
+    assert est["status_since_estimated"] is True
+    assert next(r for r in rows if r["rma_id"] == "912355")["flags"][0]["code"] == "CORE_TEARDOWN"
+    # Excluded by default: blank / Core Credit / Core&Inspection return codes, Pressure Vessel, non-Received statuses.
+    assert not {"912350", "912351", "912354", "912356", "912347", "912353"} & {r["rma_id"] for r in rows}
+
+
+def test_work_list_chip_filters_match_trimmed_uppercase(client):
+    rows = client.get("/api/v1/rmas", params={"product_type": "pressure vessel ", "return_code": "WARRANTY"}).json()["results"]
+    assert [r["rma_id"] for r in rows] == ["912356"]
+    rows = client.get("/api/v1/rmas", params={"product_type": "Recip", "return_code": "Core&Inspection"}).json()["results"]
+    assert [r["rma_id"] for r in rows] == ["912354"]
+    assert client.get("/api/v1/rmas", params={"return_code": ""}).json()["results"] == []
 
 
 def test_detail_shape(client):
@@ -65,6 +99,8 @@ def test_detail_shape(client):
     assert "macola_open" not in d and "has_inspection_record" not in d
     assert d["header"]["inspection_status"] == {"group": None, "code": "Received", "description": "Received"}
     assert d["header"]["failure_code"] == "9-Oil Issue"
+    assert d["header"]["return_code"]["code"] == "Warranty"
+    assert d["status_since"] == "2026-10-26" and d["flags"] == []
     row = d["parts"][0]
     assert set(row) == {"row_id", "part_code", "issue_code", "cause_code", "note"}
     assert row["part_code"] == {"group": None, "code": "07a", "description": "Terminal box"}
@@ -183,8 +219,8 @@ def test_lock_lock_failure_closed_and_inspector(client, H):
     r = client.post("/api/v1/rmas/912349/inspection", headers=H, json=base_body(d, parts=[]))
     err = r.json()["error"]
     assert err["code"] == "RMA_NOT_OPEN" and err["details"] == {"is_open": False, "inspectable": True}
-    r = client.post("/api/v1/rmas/912345/inspection", headers={"X-Inspector": "nobody"}, json={"submission_id": sid()})
-    assert r.json()["error"]["code"] == "UNKNOWN_INSPECTOR"
+    r = client.post("/api/v1/rmas/912345/inspection", headers={"Authorization": "Bearer not-a-token"}, json={"submission_id": sid()})
+    assert r.status_code == 401 and r.json()["error"]["code"] == "UNAUTHENTICATED"
 
 
 def upload(client, H, rma, meta):
@@ -218,7 +254,11 @@ def test_report_pics_and_report(client, H):
     stale = client.put("/api/v1/rmas/912347/report-pics", headers=H, json={"submission_id": sid(), "base_signature": sig, "photos": []})
     assert stale.json()["error"]["code"] == "REPORT_PICS_CHANGED"
     b = client.post("/api/v1/rmas/912347/report", headers=H, json={"submission_id": sid(), "formats": ["pdf", "xlsx"]})
-    assert b.status_code == 200 and b.json()["photo_count"] == 2 and b.json()["status_changed"] is None
+    assert b.status_code == 200 and b.json()["photo_count"] == 2
+    # First build sets Report Complete; a rebuild only regenerates.
+    assert b.json()["status_changed"]["to"] == {"group": None, "code": "Report Complete"}
+    again = client.post("/api/v1/rmas/912347/report", headers=H, json={"submission_id": sid()}).json()
+    assert again["status_changed"] is None
     pdf = client.get("/api/v1/rmas/912347/report/pdf")
     assert pdf.headers["content-type"] == "application/pdf" and pdf.content.startswith(b"%PDF")
     client.post("/api/v1/_mock/rmas/912347/report-in-use", json={"in_use": True})
@@ -230,3 +270,31 @@ def test_report_pics_and_report(client, H):
 def test_spellcheck(client):
     r = client.post("/api/v1/spellcheck", json={"text": "The primary failure mode is the scorring of the skirts"})
     assert r.json()["issues"][0]["suggestions"] == ["scoring"]
+
+
+def test_report_already_sent_warns_and_keeps_status(client, H):
+    r = client.post("/api/v1/rmas/912359/report", headers=H, json={"submission_id": sid()}).json()
+    assert r["status_changed"] is None and "REPORT_ALREADY_SENT" in {w["code"] for w in r["warnings"]}
+    assert load(client, "912359")["header"]["inspection_status"]["code"] == "Sent to RSM"
+
+
+def test_add_to_dictionary(client):
+    text = {"text": "The scorring of the skirts"}
+    assert client.post("/api/v1/spellcheck", json=text).json()["issues"]
+    assert client.post("/api/v1/spellcheck/dictionary", json={"word": "scorring"}).status_code == 201
+    assert client.post("/api/v1/spellcheck", json=text).json()["issues"] == []
+    assert client.post("/api/v1/spellcheck/dictionary", json={"word": "two words"}).status_code == 422
+
+
+def test_photo_list_carries_part_association(client, H):
+    upload(client, H, "912345", {"kind": "part", "seq": 2, "row_id": None, "part_code": C("48a"), "issue_code": C("50")})
+    upload(client, H, "912345", {"kind": "rma", "seq": 0, "tag": "Nameplate"})
+    pics = {p["filename"]: p for p in client.get("/api/v1/rmas/912345/photos").json()["all_pics"]}
+    part = pics["02-1 Winding resistance - 50 Normal.jpg"]
+    assert part["seq"] == 2 and part["part_code"] == C("48a")
+    assert pics["00-1 Nameplate.jpg"]["part_code"] is None and pics["00-1 Nameplate.jpg"]["seq"] == 0
+
+
+def test_legacy_app_builds_work_when_auth_optional(anon, monkeypatch):
+    monkeypatch.setenv("MOCK_AUTH_OPTIONAL", "1")
+    assert anon.get("/api/v1/inspectors").json()["inspectors"][0]["username"] == "demo"

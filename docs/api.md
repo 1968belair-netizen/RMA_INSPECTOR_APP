@@ -1,6 +1,9 @@
 # RMA Inspection App — Tablet ↔ Server API (v1 DRAFT)
 
-_Rev 6 — 2026-11-17: **SAP-ready contract.** Opaque RMA and row identities, code objects with an optional
+_Rev 7 — 2026-11-18: **sign-in required** (username + password → token; replaces the inspector picker), **work
+list = Received only**, filtered by product type and return code (server settings, oldest first), `status_since` +
+estimated flag and badges on list items, server-served guided checklists (empty in v1), report build sets Report
+Complete the first time, add-to-dictionary, photo ↔ part association. Rev 6 — 2026-11-17: **SAP-ready contract.** Opaque RMA and row identities, code objects with an optional
 `group`, optional `cause_code`, backend-neutral names, summaries as ordered text blocks (v1: one "Report summary" block). Rev 5: no device key
 in v1, full-record change check, any-status work list. Rev 4: report-photo selection, report building, spell
 check. Companion to `docs/spec.md`; field-by-field backend mapping in `docs/sap_mapping.md`._
@@ -20,7 +23,7 @@ connector; **this contract and the tablet stay the same.** The mock server retur
 |---|---|
 | Base URL | `https://rma-server.example.invalid/api/v1` (real URL set in tablet Settings) |
 | Transport | HTTPS in production. JSON UTF-8, except photo upload (multipart). |
-| Auth (v1) | **None** (internal network only). Writes carry `X-Inspector: <username>` from `GET /inspectors`. Later: sign-in (§3). |
+| Auth | **Sign-in required** (§3): `Authorization: Bearer <token>` on every call except `GET /health` and `POST /auth/login`. Identity for audit comes from the token — the tablet never sends a user id. |
 | Client headers | `X-App-Version: 0.1.12`, `X-Device-Id: <uuid>` (random per install, not hardware ID) |
 | **RMA identity** | Every RMA has an opaque **`rma_id`** (used in URLs, URL-encoded) and a **`display_number`** (shown to people). The tablet never parses, pads, validates or builds either one — the server does. Macola: both are the unpadded RMA number. SAP: `rma_id` = whatever key the server uses (e.g. notification number), `display_number` = what people call the RMA. |
 | **Codes** | Every code is a **code object** `{"group": …, "code": …}` plus `description` when the server sends it. `group` is `null` for Macola; SAP catalog codes use code group + code. Codes are **strings** (`"48a"`, `"07"`, `"99 – JSIOC"`), never numbers. The tablet **stores and sends codes back exactly as given** (same `group`, same `code`, same case/spaces) and never invents or reformats one. |
@@ -65,8 +68,8 @@ All non-2xx responses:
 | HTTP | `code` | Meaning | Tablet action |
 |---|---|---|---|
 | 400 | `BAD_REQUEST` | Malformed JSON / missing field / bad checksum | Bug or re-send |
-| 401 | `UNAUTHENTICATED` | Reserved for later sign-in (not returned in v1) | Go to sign-in; keep queue |
-| 403 | `UNKNOWN_INSPECTOR` | `X-Inspector` not in the server's inspector list | Re-pick inspector |
+| 401 | `UNAUTHENTICATED` | Missing, unknown or signed-out token | Go to sign-in; keep the upload queue |
+| 401 | `INVALID_CREDENTIALS` | Wrong username or password (`/auth/login` only) | Show on the sign-in screen |
 | 403 | `PRODUCT_TYPE_NOT_ENABLED` | Capability off for this product type (e.g. scroll) | Read-only banner |
 | 404 | `RMA_NOT_FOUND` / `PHOTO_NOT_FOUND` / `REPORT_NOT_FOUND` | No such item | Show message |
 | 409 | `RMA_CHANGED` | Record changed since it was loaded | Conflict screen. **Never auto-retry.** |
@@ -105,40 +108,39 @@ All non-2xx responses:
 
 ---
 
-## 3. Inspectors and identity
+## 3. Sign-in and identity (decision 2026-11-18)
 
-### v1 (now): no sign-in
-- **No API key or token in v1** (internal network only). The tablet acts as an inspector chosen from the
-  server's list and sends `X-Inspector: <username>` on writes.
-- The server maps the inspector to the backend user for the audit trail (`audit_user_id`; Macola:
-  `<USERNAME>_SQL`). The tablet never sends a backend user id.
+- The **first screen is sign-in**: username + password, checked by the server. It replaces the inspector picker.
+- **v1 credentials are a server setting** (a small user list on the app server; mock: a fake demo user). No
+  credentials live in the app or the repo. Real directory sign-in (AD/Entra) can replace the server's check later
+  without changing this contract.
+- The app **stays signed in until the user signs out** (`expires_at: null`); the server may still revoke a token,
+  which the app sees as `401` → back to sign-in, queued work kept.
+- **All sign-ins have all functions in v1** (`roles: ["all"]`); roles come later.
+- The server maps the signed-in user to the backend audit user (`audit_user_id`; Macola: `<USERNAME>_SQL`).
 
-### `GET /inspectors`
+### `POST /auth/login` (no auth)
+Request: `{ "username": "jdoe", "password": "********", "device_id": "7b1e4c2a-…" }`
 
+Response `200`:
 ```json
 {
-  "inspectors": [
-    { "username": "jdoe", "display_name": "J. Doe", "initials": "JD", "audit_user_id": "JDOE_SQL" }
-  ],
-  "max_inspectors": 10,
-  "sign_in_required": false
+  "token": "opaque-token-example",
+  "expires_at": null,
+  "user": { "username": "jdoe", "display_name": "J. Doe", "initials": "JD", "audit_user_id": "JDOE_SQL", "roles": ["all"] }
 }
 ```
+Errors: `401 INVALID_CREDENTIALS` ("Wrong username or password.").
 
-One entry → tablet skips the picker. More than one → "Who's inspecting?" (no password).
+### `POST /auth/logout` → `204` · `GET /me` → the `user` object
 
-### Later: real sign-in (reserved path, not built in v1)
-When `sign_in_required` becomes `true`:
-- `POST /auth/login` `{ "username": "jdoe", "password": "********", "device_id": "..." }` →
-  `{ "token": "...", "expires_at": "...", "user": { <inspector object> } }`
-- `POST /auth/logout` → `204`; `GET /me` → the inspector object.
-- `Authorization: Bearer <token>` replaces `X-Inspector`. No other endpoint changes.
+The token is stored in the app's encrypted storage. `initials` pre-fill Inspected by / Summary by.
 
-> **SAP note:** SAP will need **per-inspector identity** for its audit trail (changed-by on the notification,
-> status change history). Expect real sign-in — or at least a server-side mapping of each inspector to their
-> own SAP user — to be required before SAP go-live. A shared technical user would lose who-did-what. How the
-> server authenticates to SAP per user (principal propagation, OAuth, named technical users) is an open
-> question for BITZER IT/SAP (`docs/sap_mapping.md`).
+> **SAP note:** SAP needs **per-inspector identity** for its audit trail (changed-by, status history). Sign-in gives
+> the server a real user per request; how the server authenticates to SAP per user (principal propagation, OAuth,
+> named technical users) is still open for BITZER IT/SAP (`docs/sap_mapping.md`).
+
+`GET /inspectors` (rev 5–6) is **removed**; the mock keeps it only until the app's sign-in screen ships.
 
 ---
 
@@ -187,12 +189,22 @@ Response `200` (lists shortened):
   ],
   "hidden": { "parts": [], "issues": [], "causes": [] },
   "photo_tags": ["As received", "Nameplate", "Overview", "Packaging/Freight", "Other"],
-  "work_list_statuses": [
-    { "group": null, "code": "Received" }, { "group": null, "code": "Rework in Progress" },
-    { "group": null, "code": "Inspected" }, { "group": null, "code": "Report Complete" }
+  "return_codes": [
+    { "group": null, "code": "Warranty", "description": "Warranty" },
+    { "group": null, "code": "Inspection Only", "description": "Inspection Only" },
+    { "group": null, "code": "Core&Inspection", "description": "Core&Inspection" }
   ],
+  "work_list_statuses":      [ { "group": null, "code": "Received" } ],
+  "work_list_product_types": [ "Recip", "Scroll", "Screw", "Part" ],
+  "work_list_return_codes":  [ { "group": null, "code": "Inspection Only" }, { "group": null, "code": "Repair & Return" },
+                               { "group": null, "code": "Warranty" } ],
+  "status_roles": { "inspected": "Inspected", "report_complete": "Report Complete",
+                    "report_sent": ["Sent to RSM", "Issued to Customer"] },
+  "normal_issue_codes": [ { "group": null, "code": "50" } ],
+  "checklists": {},
   "photo": { "max_edge_px": 2048, "jpeg_quality": 85 },
-  "report": { "typical_photo_count": 20, "max_photo_count": null, "auto_status_after_report": null },
+  "report": { "typical_photo_count": 20, "max_photo_count": null, "photos_per_page": 6, "fixed_pages": 2,
+              "auto_status_after_report": "Report Complete" },
   "summary_template": "The primary failure mode is the [ ] of the [ ] likely due to [ ]. ...",
   "limits": { "note": 4000, "inspected_by": 255, "summary_by": 255, "photo_tag_text": 40, "photo_max_bytes": 10485760 }
 }
@@ -211,10 +223,37 @@ Notes:
 - `status_rule: "any"` = any status in `inspection_statuses` may be set (matches the workbench). The field
   exists so the server can later send a transition table without an app update.
 - `hidden` lists code objects not offered in pickers (empty in v1); hidden codes still display on existing rows.
-- `report.max_photo_count: null` = no limit (~20 typical). `auto_status_after_report` is `null` in v1.
+- **Work list settings** (decision 2026-11-18): `work_list_statuses` (v1: Received only — not a chip),
+  `work_list_product_types` and `work_list_return_codes` are the **defaults** for the work-list filter chips; the
+  chips offer every value in `product_types` and `return_codes`. The server matches them **trimmed and
+  uppercase** (Macola `Return_Code` is CHAR(15)). All are server settings, so they can change at the SAP rollout
+  without an app update. Core&Inspection is not a default.
+- `status_roles` tells the app which statuses mean "inspected", "report complete" and "report already sent", for
+  the submit and report dialogs (spec §6). Order of `inspection_statuses` = workflow order.
+- `normal_issue_codes`: the issue code(s) meaning "normal" (Macola: `50`). Guided steps default to it; checklist
+  photo rules use it.
+- **`checklists`** (empty in v1): guided inspection lists keyed by `product_type_key`. Shape:
+  ```json
+  "checklists": {
+    "recip": {
+      "version": "2026-12-01",
+      "steps": [
+        { "part_code": { "group": null, "code": "63" }, "required": true,
+          "photos": [
+            { "slot": "overall", "label": "Overall", "required_when": "always" },
+            { "slot": "detail",  "label": "Detail",  "required_when": "non_normal" }
+          ] }
+      ]
+    }
+  }
+  ```
+  `required_when`: `always` · `non_normal` (issue not in `normal_issue_codes`) · `never` (optional). Planned grid:
+  required part + `50` Normal → overall photo required; non-normal → overall + detail required. Requirements apply
+  only in guided mode.
+- `report.max_photo_count: null` = no limit (~20 typical). Pages ≈ `fixed_pages` + ⌈photos ÷ `photos_per_page`⌉.
+  `auto_status_after_report: "Report Complete"` — the first successful build sets it (§9.3).
 - `summary_template` fills the first summary block via "Insert standard wording".
 - At SAP cutover the same shape carries SAP catalog codes; `source` becomes `"sap"`.
-- Per-family checklists (later) will be an optional `checklists` object keyed by `product_type_key`.
 
 ---
 
@@ -238,7 +277,11 @@ Response `200`:
       "failed_serial_no": "25X0000001",
       "product_type": "Recip",
       "product_type_key": "recip",
+      "return_code": { "group": null, "code": "Warranty", "description": "Warranty" },
       "inspection_status": { "group": null, "code": "Received", "description": "Received" },
+      "status_since": "2026-10-26",
+      "status_since_estimated": false,
+      "flags": [ { "code": "CORE_TEARDOWN", "label": "In core teardown log" } ],
       "is_open": true,
       "inspectable": true,
       "locked": false
@@ -246,15 +289,27 @@ Response `200`:
   ]
 }
 ```
+- `status_since` = date of the last **real** status change (§11); `status_since_estimated: true` when there is
+  no audit history and the date is the RMA entry date — the app shows "estimated". The app shows age from it.
+- `flags` = badges the server wants shown (v1: `CORE_TEARDOWN`). Unknown flag codes are shown by `label`.
 
 `matched_on`: `"rma"`, `"serial"` or `"none"`. Empty `results` = no match (still `200`).
 
-### `GET /rmas?limit=50` — work list
+### `GET /rmas?product_type=…&return_code=…` — work list (decision 2026-11-18)
 
-Without `inspection_status` the server uses its default (`work_list_statuses`). The tablet's filter chips can
-ask for any statuses by code: `?inspection_status=En%20Route,Report%20Complete` (comma-separated status
-`code`s; with SAP groups: `group:code`). Response: `{ "results": [ <search item shape> ], "generated_at": "..." }`,
-newest activity first. Only open, inspectable RMAs.
+- Shows **only** RMAs that are open (Macola: combined header view `status='O'` joined to `OERMAHDR_iPro`, same rule
+  as the Trend Tracker), inspectable, and at a `work_list_statuses` status (v1: **Received**).
+- `product_type` = comma-separated product type values; `return_code` = comma-separated return-code `code`s
+  (`group:code` when a group exists). **Omitted parameter = the server default** (`work_list_*`); an empty value
+  matches nothing. Matching is trimmed, uppercase.
+- Sort: **oldest `status_since` first, then RMA number.**
+- Scroll RMAs are listed (Scroll is a default product type) but open read-only (capabilities off).
+- Response: `{ "results": [ <search item shape> ], "generated_at": "..." }`.
+
+Example: `GET /rmas?product_type=Recip,Screw&return_code=Warranty,Repair%20%26%20Return`
+
+**RMAs with a draft on this tablet** stay on that tablet's list even if they no longer match (return code or status
+changed); the app flags them "Return code / status changed" (spec §3). That is app-side; the server just lists.
 
 ---
 
@@ -282,7 +337,7 @@ Response `200`:
     "model": "4FE-28Y",
     "failed_serial_no": "25X0000001",
     "sales_order_no": "SO-000000",
-    "return_code": "Warranty",
+    "return_code": { "group": null, "code": "Warranty", "description": "Warranty" },
     "inspection_status": { "group": null, "code": "Received", "description": "Received" },
     "credit_status": "",
     "failed_date": "2/17/2026",
@@ -292,6 +347,9 @@ Response `200`:
     "comments": "Example: customer reports repeated trips"
   },
 
+  "status_since": "2026-10-26",
+  "status_since_estimated": false,
+  "flags": [],
   "lock": { "locked": false, "held_by": null, "host": null, "possibly_stale": false,
             "checked_at": "2026-11-17T10:41:12-05:00" },
 
@@ -339,7 +397,7 @@ Notes:
 - `cause_code` is optional on every row: `null` in v1 (Macola has no cause per row).
 - `summary.blocks` follow `summary_blocks` from `/codelists`; `defect_code` is `null` when not set.
   `summary.exists: false` = no summary record yet (server creates it on the first save).
-- Read-only on the tablet (RMA-team fields): `credit_status`, `return_code`, `failure_code`,
+- `header.return_code` is a code object (display only). Read-only on the tablet (RMA-team fields): `credit_status`, `return_code`, `failure_code`,
   `failure_description`, `comments`. They are display text.
 - `is_open: false` or `inspectable: false` → all capabilities `false`.
 - `product_type_source`: `"header"` or `"model"` (derived from model prefix because the header was blank).
@@ -367,7 +425,6 @@ Request:
   "submission_id": "4d3c2b1a-0000-4000-8000-00000000a001",
   "base_signature": "sig-3f9d0c7a1b",
   "product_type_key": "recip",
-  "inspector": "jdoe",
   "captured_at": "2026-11-17T10:55:30-05:00",
   "device_id": "7b1e4c2a-0000-4000-8000-000000000001",
 
@@ -396,7 +453,10 @@ Request:
 - `summary` may be `null`, or contain **only changed parts**: an omitted key = unchanged; `"defect_code": null`
   = clear it; `blocks` lists only changed blocks (`"text": ""` clears a block); each block ≤ its `max_length`.
 - Codes are sent exactly as received (§1.1). `cause_code` must be `null` while `/codelists` `causes` is empty.
-- `inspector` must match `X-Inspector`; the server builds the backend audit user itself.
+- Who did it comes from the sign-in token; the server builds the backend audit user itself.
+- **Status the app sends on submit** (decision 2026-11-18, spec §6): before `status_roles.inspected` → `to:
+  Inspected`; at or after `report_complete` → no status change, and the app rebuilds the report (§9.3) after a
+  successful save ("Update inspection findings").
 
 Server steps (Macola = `apply_flex` logic): validate → backend lock check (fail closed) → re-read with lock +
 signature compare → backup → status (+ audit row) → summary record (update or create) → parts
@@ -483,7 +543,7 @@ Stale lock: same `RMA_LOCKED` with `"possibly_stale": true`. The server never cl
 }
 ```
 Other field codes: `READ_ONLY_FIELD`, `UNKNOWN_STATUS`, `STATUS_FROM_MISMATCH`, `UNKNOWN_BLOCK`,
-`CAUSE_NOT_SUPPORTED`, `INSPECTOR_MISMATCH`, `DUPLICATE_ROW`.
+`CAUSE_NOT_SUPPORTED`, `DUPLICATE_ROW`.
 
 #### `409 RMA_NOT_OPEN` / `403 PRODUCT_TYPE_NOT_ENABLED`
 ```json
@@ -546,10 +606,17 @@ Response `201 Created`:
 {
   "folder_found": true,
   "folder_display": "912xxx\\9123xx\\912345",
-  "all_pics": [ { "filename": "00-1 As received.jpg", "bytes": 512000, "modified": "2026-11-17T10:47:00-05:00" } ],
+  "all_pics": [
+    { "filename": "00-1 As received.jpg", "bytes": 512000, "modified": "2026-11-17T10:47:00-05:00",
+      "seq": 0, "part_code": null, "row_id": null },
+    { "filename": "03-1 Piston assy, skirt - 34 Scored, Scratched.jpg", "bytes": 612344, "modified": "…",
+      "seq": 3, "part_code": { "group": null, "code": "63" }, "row_id": "L3.8a1e44d2c9" }
+  ],
   "report_pics": { "folder_found": false, "signature": "rp-empty", "files": [] }
 }
 ```
+`seq` / `part_code` / `row_id` link a photo to its part (from the upload record; `seq` from the filename for older
+photos, `part_code` null when unknown). The Report tab uses them to filter the photo strip by the selected part.
 
 ### `GET /rmas/{rma_id}/photos/{folder}/{filename}?size=thumb|full`
 `folder` = `all` or `report`. Returns `image/jpeg` (`thumb` = 320 px long edge). `404 PHOTO_NOT_FOUND` if gone.
@@ -585,7 +652,10 @@ Errors: `409 REPORT_PICS_CHANGED` (`details.current`, `details.current_signature
 ### 9.3 `POST /rmas/{rma_id}/report` — build the report
 Runs the report generator (Macola era: the workbench's `rma_report.py` / `rma_report_xlsx.py`) on current
 backend data + `Report Pics `. The tablet must have no unsent findings for this RMA. Existing report files are
-backed up first. No status change in v1.
+backed up first.
+**Status (decision 2026-11-18):** if the RMA is before `status_roles.report_complete`, the first successful build
+sets **Report Complete** (audited, `status_changed` in the response). Later builds only regenerate. At a
+`report_sent` status the build still regenerates and adds warning `REPORT_ALREADY_SENT`.
 
 Request: `{ "submission_id": "6b5c4d3e-0000-4000-8000-00000000d001", "formats": ["pdf", "xlsx"] }`
 
@@ -601,11 +671,12 @@ Response `200`:
   ],
   "photo_count": 3,
   "previous_backed_up": false,
-  "status_changed": null,
+  "status_changed": { "from": { "group": null, "code": "Inspected" }, "to": { "group": null, "code": "Report Complete" }, "audited": true },
   "warnings": [ { "code": "NO_CREDIT_STATUS", "message": "No credit status yet — page 1 says \"Disposition Pending\"." } ]
 }
 ```
-Warning codes: `NO_CREDIT_STATUS`, `NO_LETTER_TEXT`, `NO_REPORT_PICS`, `UNKNOWN_CODE_ROW`, `EMPTY_SUMMARY`.
+Warning codes: `NO_CREDIT_STATUS`, `NO_LETTER_TEXT`, `NO_REPORT_PICS`, `UNKNOWN_CODE_ROW`, `EMPTY_SUMMARY`,
+`REPORT_ALREADY_SENT`.
 Errors: `409 RMA_NOT_OPEN`, `409 REPORT_FILE_IN_USE` (`details.filename`), `403`, `503 BACKEND_UNAVAILABLE` /
 `PHOTO_STORE_UNAVAILABLE`, `500 SERVER_ERROR` (old files untouched). The tablet waits up to 120 s.
 
@@ -617,7 +688,11 @@ Errors: `409 RMA_NOT_OPEN`, `409 REPORT_FILE_IN_USE` (`details.filename`), `403`
 
 ### 9.6 `POST /spellcheck`
 Request `{ "text": "..." }` → `{ "issues": [ { "word": "scorring", "start": 32, "end": 40, "suggestions": ["scoring"] } ] }`
-(workbench `rma_spell.py` trade-word list). "Add to dictionary" is a desk action in v1.
+(workbench `rma_spell.py` trade-word list). The app runs it **automatically** before every report build.
+
+### 9.7 `POST /spellcheck/dictionary`
+Request `{ "word": "slinger" }` → `201 { "word": "slinger", "added": true }`. Adds one word to the shared dictionary
+(Macola era: the workbench's `rma_tools_dictionary.txt`), so it is never flagged again for anyone. `422` if not one word.
 
 ---
 
@@ -626,11 +701,10 @@ Request `{ "text": "..." }` → `{ "issues": [ { "word": "scorring", "start": 32
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Reachability, versions, `min_app_version` |
-| GET | `/inspectors` | Inspector list, initials, `sign_in_required` |
-| POST | `/auth/login` · `/auth/logout`, GET `/me` | **Reserved** for later sign-in |
+| POST | `/auth/login` · `/auth/logout`, GET `/me` | Sign-in (required), sign-out, current user |
 | GET | `/codelists` | Code objects (parts, issues, causes, defect codes, statuses), summary blocks, product types + capabilities, settings |
 | GET | `/rmas/search?q=` | Lookup by anything the inspector types |
-| GET | `/rmas?inspection_status=` | Work list |
+| GET | `/rmas?product_type=&return_code=` | Work list (Received only; oldest first) |
 | GET | `/rmas/{rma_id}` | Header, capabilities, lock, parts (row ids), summary blocks, photos, signature |
 | GET | `/rmas/{rma_id}/lock` | Live lock state |
 | POST | `/rmas/{rma_id}/inspection` | Write parts + summary + optional status (all or nothing) |
@@ -640,7 +714,7 @@ Request `{ "text": "..." }` → `{ "issues": [ { "word": "scorring", "start": 32
 | PUT | `/rmas/{rma_id}/report-pics` | Set report photos + captions |
 | POST | `/rmas/{rma_id}/report` | Build report PDF + XLSX |
 | GET | `/rmas/{rma_id}/report` · `/report/pdf` | Report info / PDF preview |
-| POST | `/spellcheck` | Spell check text |
+| POST | `/spellcheck` · `/spellcheck/dictionary` | Spell check text · add a word to the dictionary |
 
 Read-only on the tablet: credit status, return code, failure code, failure description, comments (RMA-team fields).
 Not in the API: close/reopen (RMA-team functions).
@@ -658,6 +732,17 @@ Not in the API: close/reopen (RMA-team functions).
 - Lift the 20-picture cap in the shared report module (workbench repo change).
 - Report generation runs in-process — no `subprocess`, no Excel automation. Folder-style packaging; service with auto-restart.
 - Server log: user, RMA, endpoint, result code — never note text or photo bytes.
+- **Work-list queries come from the Trend Tracker** (decision 2026-11-18). Phase 4 (local session): extract the
+  Trend Tracker's inline SQL into a side-effect-free `rma_queries.py` shared by `daily_snapshot_V4.py`,
+  `refresh_aging_data.py` and the app server. Rules: open = combined view `status='O'` JOIN `OERMAHDR_iPro`;
+  return code read `RTRIM(ISNULL(Return_Code,''))`, matched trimmed/uppercase.
+- **`status_since`** = latest `OERMAAUD_iPro.DateTimeOfChange` for `Field_Name='RMA_Inspection_Status'` where
+  `Old_Status <> New_Status` (real changes only — same-value re-saves don't reset it), tiebreak `A4glidentity`;
+  no audit rows → `rma_dt_entered` with `status_since_estimated = true`. (The Trend Tracker's current
+  Status_Since counts same-value re-saves and has no tiebreak; the shared module should adopt this rule.)
+- Core-teardown flag from the existing Core Teardown Log cache.
+- v1 users (username, password hash, display name, initials, backend audit user) live in a server-side setting
+  outside the repo.
 
 ---
 

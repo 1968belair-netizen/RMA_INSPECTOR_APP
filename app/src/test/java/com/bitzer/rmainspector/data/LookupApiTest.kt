@@ -41,10 +41,18 @@ class LookupApiTest {
     fun workListSendsStatusCodesWithGroups() = runBlocking {
         server.enqueue(MockResponse().setBody(
             """{"results":[{"rma_id":"912345","display_number":"912345","model":"4FE-28Y",
+               "return_code":{"group":null,"code":"Warranty","description":"Warranty"},
                "inspection_status":{"group":null,"code":"Received","description":"Received"},
+               "status_since":"2026-10-26","status_since_estimated":true,
+               "flags":[{"code":"CORE_TEARDOWN","label":"In core teardown log"}],
                "is_open":true,"inspectable":true,"locked":false}],"generated_at":"2026-11-17T10:00:00-05:00"}"""))
         val r = api.workList(base, listOf(CodeKey(null, "Received"), CodeKey("ZRMA", "E0003"))) as ApiResult.Ok
         assertEquals("912345", r.value.results.single().rmaId)
+        val item = r.value.results.single()
+        assertEquals("Warranty", item.returnCode?.code)
+        assertEquals("2026-10-26", item.statusSince)
+        assertTrue(item.statusSinceEstimated)
+        assertEquals("CORE_TEARDOWN", item.flags.single().code)
         val url = server.takeRequest().requestUrl!!
         assertEquals("Received,ZRMA:E0003", url.queryParameter("inspection_status"))
         assertEquals("50", url.queryParameter("limit"))

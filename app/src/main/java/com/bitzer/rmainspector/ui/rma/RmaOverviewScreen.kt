@@ -119,7 +119,7 @@ private fun Overview(rma: RmaDetail) {
             Field("Serial", h.failedSerialNo)
             Field("Sales order", h.salesOrderNo)
             Field("Product type", rma.productType.ifBlank { "—" } + if (rma.productTypeSource == "model") "  (from model: ${rma.productTypeKey})" else "")
-            Field("Return code", h.returnCode)
+            Field("Return code", h.returnCode.label())
             Field("Inspection status", h.inspectionStatus.label())
             Field("Credit status", h.creditStatus.ifBlank { "Not set yet" })
             Field("Failed date", h.failedDate)
