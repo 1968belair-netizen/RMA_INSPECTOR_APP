@@ -119,6 +119,18 @@ abstract class ScreenCatalog(private val device: String) {
         workspace(WorkspaceState(load = WorkspaceLoad.Error("RMA 999 was not found.", notFound = true)))
     }
 
+    // --- Guided inspection (D2)
+    @Test fun guided_required_photo_missing() = shot("guided_required_photo_missing") { workspace(GuidedScreenshotData.requiredMissing) }
+    @Test fun guided_step_normal() = shot("guided_step_normal") { workspace(GuidedScreenshotData.normalReady) }
+    @Test fun guided_step_non_normal_detail_required() = shot("guided_step_non_normal_detail_required") {
+        workspace(GuidedScreenshotData.nonNormalDetailMissing)
+    }
+    @Test fun guided_complete_dialog() = shot("guided_complete_dialog") { workspace(GuidedScreenshotData.complete) }
+    @Test fun guided_button_start() = shot("guided_button_start") { workspace(GuidedScreenshotData.buttonStart) }
+    @Test fun guided_button_continue() = shot("guided_button_continue") { workspace(GuidedScreenshotData.buttonContinue) }
+    @Test fun guided_button_complete() = shot("guided_button_complete") { workspace(GuidedScreenshotData.buttonComplete) }
+    @Test fun guided_button_disabled() = shot("guided_button_disabled") { workspace(GuidedScreenshotData.buttonDisabled) }
+
     // --- Shared code pickers (A3)
     @Test fun dropdown_closed() = shot("dropdown_closed") {
         Surface(Modifier.fillMaxSize()) {
