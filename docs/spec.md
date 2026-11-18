@@ -30,12 +30,18 @@ decisions: `docs/decisions.md`._
 - **First screen:** username + password, checked by the server (`POST /auth/login` → token). Replaces the
   inspector picker.
 - v1 credentials are a **server setting** (mock: a fake demo user). No credentials in the app or the repo.
-- **Stays signed in until the user signs out** (Settings → Sign out, which clears the screen history). Only the
-  token is stored (encrypted with an Android Keystore key) — **never the password**.
+- **Stays signed in until the user signs out** (Settings → Sign out). Sign-out clears the **session and the screen
+  history only — never the upload queue**. Only the token is stored (encrypted with an Android Keystore key) —
+  **never the password**.
 - **A `401` mid-session** shows sign-in on top of the current screen; after signing in again the user returns to
   the **same screen and RMA** (fallback: Home). Back on that sign-in screen leaves the app.
-- **Queued work is kept** and sent once signed in again. It keeps the identity of the inspector who made it — if a
-  different user signs in, queued work is **never re-attributed** to them.
+- **Queued uploads belong to the inspector who made them.** While that inspector is signed out they are **held** on
+  the tablet until the **same** inspector signs in again. They are never sent under another user's token and never
+  re-attributed.
+- **Sign out with waiting uploads:** "You have N uploads waiting. Send now before signing out?" — **Send now**
+  (uploads first with progress, then signs out; if offline, says so and offers **Sign out anyway**) ·
+  **Sign out anyway** (uploads stay held).
+- **Sign in with held uploads:** "N uploads waiting from your earlier session" — sent automatically.
 - The signed-in user's initials pre-fill Inspected by / Summary by. Their name is shown in Settings.
 - Sign-in screen also shows server reachability and the app version, and links to Settings (server address).
 
@@ -214,8 +220,11 @@ The tablet **never** silently overwrites and never retries a `409 RMA_CHANGED` o
 
 ### 6.6 Upload queue
 - List of queued submissions and photos per RMA with state (waiting / sending / blocked: reason).
-- Each queued item stores the inspector who made it (user + initials) and is sent under that identity, even if a
-  different user is signed in later (decision 2026-11-18). The queue is not cleared by sign-out or a `401`.
+- Each queued item stores the inspector who made it (user + initials). It is sent only while **that** inspector is
+  signed in, with their token; otherwise it is **held** (never sent under another user's token, never
+  re-attributed). Sign-out and `401` never clear the queue (decision 2026-11-18, §2).
+- Settings → **Upload queue** groups items by inspector. Another inspector's held items are **read-only**: other
+  users can see that items are waiting (count, RMA) but cannot open, send, retry or cancel them.
 - Retry now, cancel (with confirmation), view error detail.
 
 
