@@ -2,46 +2,46 @@
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
-## 1. Milestones and open work
+## 1. Milestones and open work — DEMO PRIORITY (2026-11-18 13:58)
+**Goal:** full loop working against the mock server for a manager demo (see decisions.md "Demo plan"). No in-app demo
+mode. Offline-queue edge cases, conflict screens and lock handling beyond the banner wait until after the demo.
+**Milestones:** A done · B/C in progress · **E Demo** (new, #45, #46). Report "DEMO READY" + APK link + `docs/demo.md` when done.
 
-**Milestone A Navigate:** approved by Jacob (device test, no issues). Report: issue #33 (closed). One follow-up:
-#36 (A6).
-**Current:** milestone **B Inspect**, running in parallel with **C Report** (rapid mode).
+### Demo critical path
+`#44 B2 Photos` → `#8 B3 Submit inspection` → `#11 C2 Submit report` (needs `#40 C1` too) → `docs/demo.md`.
+In parallel: `#45 M1` mock PDF, `#46 M2` demo dataset + checklist; then `#20 D2` guided inspection if time allows.
 
 ### Open PRs
 | PR | Issue | Branch | State |
 |---|---|---|---|
-| #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅, emulator running. Merge when green and acceptance met. |
-| #42 | — | `docs/approve-q3-q4-q6` | Docs: Q3/4/6 approved; rebased on main after #39. |
-| #44 | #7 B2 Photos | `feature/b2-photos` | in CI (build + emulator running). Merge when green and acceptance met. |
+| #40 | #10 C1 Report tab | `feature/c1-report-tab` | **owned by the old session — do not touch** until merged or it stops, then take over. |
+| #44 | #7 B2 Photos | `feature/b2-photos` | thread fixing build failure + conflict with main (after #43). |
+| (coming) | #45 M1 mock report PDF | `feature/m1-report-pdf` | thread started 14:05 ET |
+| (coming) | #46 M2 demo dataset/checklist | `feature/m2-demo-dataset` | thread started 14:05 ET |
+| (docs) | — | `docs/demo-plan` | this update; labelled `emulator` to run emulator tests on main (A6 + B1 together). |
 
-**Merged this session:** #39 B1 Findings tab (merged by Jacob); #37 A6 "(blank)" chip (squash 8777e16); #43 D1 camera search (squash 91cbe41). Real-tablet test of the camera is still needed.
+**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (91cbe41; needs a real-tablet test) · #42 docs.
 
 ### Open issues
-| Issue | Milestone | State | Branch | Depends on |
-|---|---|---|---|---|
-| #10 C1 Report tab | C | PR #40 | `feature/c1-report-tab` | — |
-| #7 B2 Photos tab | B | **in progress** | `feature/b2-photos` | B1 ✅ |
-| #8 B3 Submit inspection | B | not started | — | B2 (B1 ✅) |
-| #9 B4 Offline queue, conflicts, lock/retry | B | not started | — | B3. Acceptance includes the 2026-11-18 queue/sign-out rules |
-| #11 C2 Submit report | C | not started | — | B3 (and C1) |
-| #20 D2 Guided inspection | D | not started | — | B2 (B1 ✅) |
-| #34 Idea: pre-filled checklist on Findings | D | **idea — do not implement** | — | decide later |
-| #21 S1 Real server, read-only | server | **ready**, local on Jacob's laptop | — | — |
-| #22 S2 Real server, write side | server | later, local | — | matching tablet issues |
+| Issue | Milestone | State | Depends on |
+|---|---|---|---|
+| #7 B2 Photos | B | PR #44 | B1 ✅ |
+| #10 C1 Report tab | C | PR #40 (old session) | — |
+| #45 M1 Mock report PDF | E Demo | in progress | — |
+| #46 M2 Demo dataset + checklist + run script | E Demo | in progress | — |
+| #8 B3 Submit inspection | B | not started (banner only for offline; no queue edge cases) | B2 |
+| #11 C2 Submit report | C | not started | B3, C1 |
+| #20 D2 Guided inspection | D | not started — if time allows | B2, #46 checklist |
+| #9 B4 Queue, conflicts, lock/retry | B | **deferred until after the demo** | B3 |
+| #34 Idea: pre-filled checklist | D | **idea — do not implement** | — |
+| #21 S1 Real server, read-only | server | ready, local on Jacob's laptop. Acceptance now explicitly includes `(blank)` in `work_list_product_types` defaults + the `(blank)` token | — |
+| #22 S2 Real server, write side | server | later, local | matching tablet issues |
 
-(#5 B1, #36 A6 and #19 D1 are closed by their merges.)
-
-## 2. Work in progress and exact next steps
-1. **#40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
-   still blocked, post "READY TO MERGE: #n" in chat and keep working.
-2. **#7 B2** (PR #44) is in a Sonnet thread (worktree `/home/claude/wt-b2`). #19 D1 is done.
-3. **Only 2 issues in progress (#10, #7):** every remaining issue depends on B2/B3/C1 (or is local server work), so nothing else can start yet. When B2 merges start #8 B3 and #20 D2 together. Candidates: next candidates are #8 B3 (after B2) → #9 B4, #11 C2 (after B3 + C1) and #20 D2.
-4. **After B and C are done**, post one short milestone report covering both (APK link, screenshots, tests, gaps,
-   questions). Jacob tests B and C together on his phone.
-5. Worktrees used by threads: `/home/claude/wt-b2` (earlier ones are gone). These are
-   session-local; a new session starts from a fresh clone.
-6. Thread rules file (session-local copy): the same content is in CLAUDE.md "Rapid development mode" and below.
+## 2. Next steps
+1. When #44 is green and acceptance met → attempt the merge (Jacob approves); if blocked post "READY TO MERGE: #n".
+2. After B2 merges start #8 B3 (and #20 D2 once #46 merges). After B3 + C1 merge start #11 C2.
+3. When the loop works: write `docs/demo.md` (setup + 5-minute tap-by-tap script), then post DEMO READY.
+4. Worktrees used by threads: `/home/claude/wt-b2`, `/home/claude/wt-m1`, `/home/claude/wt-m2` (session-local).
 
 ## 3. Rapid-mode rules in force (CLAUDE.md → Workflow → Rapid development mode)
 1. Keep **3 issues in progress at all times**. Start independent work now (C against the mock); only truly

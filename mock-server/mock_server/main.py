@@ -29,7 +29,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from . import fake_data as fd
+from .fake_images import make_fake_jpeg
 from . import naming
+from .report_pdf import build_report_pdf
 
 API_VERSION = "1.0"
 SERVER_VERSION = "0.2.0-mock"
@@ -54,6 +56,15 @@ def norm(text: Optional[str]) -> str:
     """Server-side matching rule for settings (return codes, product types, statuses): trimmed, uppercase."""
     return (text or "").strip().upper()
 FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64 + b"\xff\xd9"
+
+
+def demo_mode() -> bool:
+    """MOCK_DATASET=demo selects the curated demo dataset; anything else = the default test dataset."""
+    return os.environ.get("MOCK_DATASET", "").strip().lower() == "demo"
+
+
+def wl_product_types() -> list:
+    return fd.WORK_LIST_PRODUCT_TYPES + (fd.DEMO_EXTRA_WORK_LIST_TYPES if demo_mode() else [])
 
 
 def now() -> str:
@@ -122,11 +133,11 @@ def status_obj(code_text: str) -> dict:
 class Store:
     def __init__(self):
         self.lock = threading.RLock()
-        self.reset()
+        # reset() is called once at the end of this module (the demo seed needs the report helpers defined below).
 
     def reset(self):
         with self.lock:
-            self.rmas = fd.initial_rmas()
+            self.rmas = fd.demo_rmas() if demo_mode() else fd.initial_rmas()
             self.files: dict[tuple[str, str, str], bytes] = {}
             self.replays: dict[str, tuple[int, dict]] = {}
             self.backups: list[dict] = []
@@ -134,16 +145,35 @@ class Store:
             self.users = load_users()
             self.tokens: dict[str, str] = {}          # token -> username (no expiry: signed in until sign-out)
             self.dictionary: set[str] = set()         # words added via "Add to dictionary"
-            r = self.rmas["912347"]
-            for name in ("00-1 As received.jpg", "01-1 Stator - 46 Burnt.jpg",
-                         "02-1 Winding to ground insulation - 38 Ground fault.jpg"):
-                r["all_pics"].append(name)
-                self.files[("912347", "all", name)] = FAKE_JPEG
-            r["report_pics"].append("01-1 Stator - 46 Burnt.jpg")
-            self.files[("912347", "report", "01-1 Stator - 46 Burnt.jpg")] = FAKE_JPEG
+            if demo_mode():
+                self._seed_demo_completed()
+            else:
+                r = self.rmas["912347"]
+                for name in ("00-1 As received.jpg", "01-1 Stator - 46 Burnt.jpg",
+                             "02-1 Winding to ground insulation - 38 Ground fault.jpg"):
+                    r["all_pics"].append(name)
+                    self.files[("912347", "all", name)] = FAKE_JPEG
+                r["report_pics"].append("01-1 Stator - 46 Burnt.jpg")
+                self.files[("912347", "report", "01-1 Stator - 46 Burnt.jpg")] = FAKE_JPEG
             for v in self.rmas.values():
                 v["folder_exists"] = bool(v["all_pics"])
                 v["report_folder_exists"] = bool(v["report_pics"])
+
+    def _seed_demo_completed(self):
+        """The finished example: real small JPEGs, report photos and an already-built report."""
+        rid = fd.DEMO_COMPLETED_RMA
+        r = self.rmas[rid]
+        for name, label, rgb in fd.DEMO_COMPLETED_PHOTOS:
+            r["all_pics"].append(name)
+            self.files[(rid, "all", name)] = make_fake_jpeg(label, rgb)
+        for name in fd.DEMO_COMPLETED_REPORT_PICS:
+            r["report_pics"].append(name)
+            self.files[(rid, "report", name)] = self.files[(rid, "all", name)]
+        # Same path build_report uses: real PDF from the seeded data and its report photos.
+        pdf, pages = build_report_pdf(_report_data(r), [
+            (name.rsplit(".", 1)[0], self.files[(rid, "report", name)])
+            for name in naming.natural_sorted(r["report_pics"])])
+        r["report"] = {"generated_at": now(), "pdf": pdf, "pages": pages, "xlsx_bytes": 8800}
 
 
 store = Store()
@@ -414,12 +444,12 @@ def _codelists() -> dict:
         "photo_tags": fd.PHOTO_TAGS,
         "return_codes": [{"group": None, "code": c, "description": c} for c in fd.RETURN_CODES],
         "work_list_statuses": [{"group": None, "code": s} for s in fd.WORK_LIST_STATUSES],
-        "work_list_product_types": fd.WORK_LIST_PRODUCT_TYPES,
+        "work_list_product_types": wl_product_types(),
         "work_list_return_codes": [{"group": None, "code": c} for c in fd.WORK_LIST_RETURN_CODES],
         "status_roles": {"inspected": "Inspected", "report_complete": "Report Complete",
                          "report_sent": ["Sent to RSM", "Issued to Customer"]},
         "normal_issue_codes": [{"group": None, "code": "50"}],
-        "checklists": {},
+        "checklists": fd.demo_checklists() if demo_mode() else {},
         "photo": {"max_edge_px": 2048, "jpeg_quality": 85},
         "report": {"typical_photo_count": 20, "max_photo_count": None, "photos_per_page": 6, "fixed_pages": 2,
                    "auto_status_after_report": "Report Complete"},
@@ -465,7 +495,7 @@ def work_list(product_type: Optional[str] = None, return_code: Optional[str] = N
     filtered by product type and return code (defaults = server settings), oldest status_since first.
     The product_type token "(blank)" matches an empty product type (issue #36)."""
     statuses = {norm(s) for s in fd.WORK_LIST_STATUSES}
-    types = _csv_codes(product_type) if product_type is not None else {norm(t) for t in fd.WORK_LIST_PRODUCT_TYPES}
+    types = _csv_codes(product_type) if product_type is not None else {norm(t) for t in wl_product_types()}
     codes = _csv_codes(return_code) if return_code is not None else {norm(c) for c in fd.WORK_LIST_RETURN_CODES}
     rows = [r for r in store.rmas.values()
             if r["is_open"] and r["inspectable"]
@@ -797,27 +827,21 @@ async def put_report_pics(rma_id: str, request: Request):
 
 # --- report
 
-def _fake_pdf(title: str, pages: int) -> bytes:
-    """Minimal valid PDF (mock only)."""
-    objs = ["<< /Type /Catalog /Pages 2 0 R >>"]
-    kids = " ".join(f"{3 + i * 2} 0 R" for i in range(pages))
-    objs.append(f"<< /Type /Pages /Kids [{kids}] /Count {pages} >>")
-    for i in range(pages):
-        text = f"BT /F1 18 Tf 72 720 Td ({title} - page {i + 1} of {pages}) Tj ET".encode()
-        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {4 + i * 2} 0 R "
-                    f"/Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>")
-        objs.append(f"<< /Length {len(text)} >>\nstream\n{text.decode()}\nendstream")
-    out = bytearray(b"%PDF-1.4\n")
-    offsets = []
-    for n, o in enumerate(objs, start=1):
-        offsets.append(len(out))
-        out += f"{n} 0 obj\n{o}\nendobj\n".encode()
-    xref = len(out)
-    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
-    for off in offsets:
-        out += f"{off:010d} 00000 n \n".encode()
-    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
-    return bytes(out)
+def _report_data(rma: dict) -> dict:
+    h, s = rma["header"], summary_view(rma)
+    parts = []
+    for p in parts_view(rma):
+        pc, ic = p["part_code"], p["issue_code"]
+        parts.append({"part": f"{pc['code']} - {pc['description']}" if pc else "",
+                      "issue": f"{ic['code']} - {ic['description']}" if ic else "", "note": p["note"]})
+    dc = s["defect_code"]
+    return {"rma": rma["display_number"], "model": h["model"], "serial": h["failed_serial_no"],
+            "customer_name": h["customer_name"], "failed_date": h["failed_date"],
+            "generated_date": datetime.now(EASTERN).strftime("%m/%d/%Y"), "return_code": h["return_code"],
+            "status": h["inspection_status"], "credit_status": h["credit_status"],
+            "inspected_by": s["inspected_by"], "summary_by": s["summary_by"], "parts": parts,
+            "diagnosis": f"{dc['code']} - {dc['description']}" if dc else "",
+            "summary": "\n\n".join(b["text"] for b in s["blocks"] if b["text"])}
 
 
 @api.post("/rmas/{rma_id}/report")
@@ -846,8 +870,9 @@ async def build_report(rma_id: str, request: Request):
         if not any(rma["summary"]["blocks"].values()):
             warnings.append({"code": "EMPTY_SUMMARY", "message": "The summaries are empty."})
         photo_count = len(rma["report_pics"])
-        pages = 2 + math.ceil(photo_count / 6)
-        pdf = _fake_pdf(f"MOCK REPORT RMA {num}", pages)
+        pdf, pages = build_report_pdf(_report_data(rma), [
+            (name.rsplit(".", 1)[0], store.files.get((rma["rma_id"], "report", name), b""))
+            for name in naming.natural_sorted(rma["report_pics"])])
         previous = rma["report"] is not None
         rma["report"] = {"generated_at": now(), "pdf": pdf, "pages": pages, "xlsx_bytes": 8800}
         # First successful build sets Report Complete (audited); later builds only regenerate (decision 2026-11-18).
@@ -918,6 +943,7 @@ async def add_to_dictionary(request: Request):
 # --- mock-only test hooks
 
 @api.post("/_mock/reset")
+@app.post("/mock/reset")
 def mock_reset():
     store.reset()
     return {"ok": True}
@@ -971,4 +997,5 @@ async def mock_report_in_use(rma_id: str, request: Request):
     return {"ok": True}
 
 
+store.reset()
 app.include_router(api)
