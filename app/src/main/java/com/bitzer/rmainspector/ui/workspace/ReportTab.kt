@@ -322,6 +322,12 @@ private fun ReportRight(report: ReportState, readOnly: Boolean, cb: ReportCallba
             )
         }
         ReportPhotosCard(report, readOnly, cb)
+        Button(
+            onClick = cb.onSubmitReport,
+            enabled = !readOnly && !report.saving,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(ReportSubmitTags.SUBMIT),
+            colors = ButtonDefaults.buttonColors(containerColor = BitzerColors.Green),
+        ) { Text("SUBMIT REPORT") }
     }
 }
 
