@@ -74,4 +74,4 @@ Known CI/session quirks:
 ## 4. Open items in `docs/questions.md` (recommended option already built; Jacob may override)
 Q3, Q4 and Q6 were **approved as built on 2026-11-18** and moved to `docs/decisions.md`. Q5 was answered ("(blank)"
 chip, on by default) and its row was removed by #37. Questions #7–10 came with B1 (#39); more may arrive with
-more by #40 (C1) — check the file on main.
+#40 (C1) — check the file on main.
