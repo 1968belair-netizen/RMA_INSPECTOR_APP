@@ -89,3 +89,16 @@ def test_default_dataset_unchanged_without_env():
     r = c.post("/api/v1/auth/login", json={"username": "demo", "password": "demo", "device_id": "t"})
     c.headers["Authorization"] = "Bearer " + r.json()["token"]
     assert c.get("/api/v1/codelists").json()["checklists"] == {}
+
+
+def test_dataset_switch_at_run_time():
+    """POST /_mock/dataset switches the data (emulator guided test) and null/default puts the default back."""
+    c = TestClient(app)
+    try:
+        assert c.post("/api/v1/_mock/dataset", json={"name": "demo"}).json() == {"ok": True, "dataset": "demo"}
+        assert "912361" in store.rmas and "912369" in store.rmas
+        assert c.post("/api/v1/_mock/dataset", json={"name": "default"}).json() == {"ok": True, "dataset": "default"}
+        assert "912347" in store.rmas and "912361" not in store.rmas
+        assert c.post("/api/v1/_mock/dataset", json={"name": "bogus"}).status_code == 400
+    finally:
+        c.post("/api/v1/_mock/dataset", json={"name": None})

@@ -57,6 +57,15 @@ object CameraTags {
 }
 
 /**
+ * Test hook for emulator tests (CI has no camera): when [provider] is set, the camera overlay shows a plain shutter that
+ * hands the file from [provider] to the normal capture path, so scaling, storage and the guided flow run for real.
+ * Always null in the real app.
+ */
+object CameraTestHook {
+    @Volatile var provider: (() -> File)? = null
+}
+
+/**
  * Full-screen camera (CameraX) over the workspace. The shutter hands the raw JPEG to [WorkspaceCallbacks.onPhotoCaptured];
  * the view model scales, rotates and stores it. The camera stays open for more shots (a row often needs several);
  * Done closes it. A retake closes itself after one shot.
@@ -65,6 +74,12 @@ object CameraTags {
 internal fun CameraOverlay(photos: PhotosState, cb: WorkspaceCallbacks) {
     val context = LocalContext.current
     BackHandler(onBack = cb.onCloseCamera)
+    CameraTestHook.provider?.let { next ->
+        Box(Modifier.fillMaxSize().background(BitzerColors.Black).testTag(CameraTags.OVERLAY)) {
+            Button(onClick = { cb.onPhotoCaptured(next()) }, modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp).heightIn(min = 56.dp).testTag(CameraTags.SHUTTER)) { Text("Take photo") }
+        }
+        return
+    }
     var granted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var denied by remember { mutableStateOf(false) }
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> granted = ok; denied = !ok }
