@@ -47,7 +47,11 @@ def test_completed_example_has_built_report_and_photos(demo):
     img = demo.get("/api/v1/rmas/912369/photos/all/" + photos["all_pics"][0]["filename"])
     assert img.content[:3] == b"\xff\xd8\xff" and len(img.content) > 1000
     assert demo.get("/api/v1/rmas/912369/report").json()["exists"] is True
-    assert demo.get("/api/v1/rmas/912369/report/pdf").content.startswith(b"%PDF")
+    pdf = demo.get("/api/v1/rmas/912369/report/pdf").content
+    assert pdf.startswith(b"%PDF")
+    import io, pypdf
+    pages = pypdf.PdfReader(io.BytesIO(pdf)).pages
+    assert sum(len(p.images) for p in pages) >= 4   # the seeded report photos are in the PDF
 
 
 def test_checklists_use_real_codes(demo):
