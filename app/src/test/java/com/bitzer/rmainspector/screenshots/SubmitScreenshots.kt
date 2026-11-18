@@ -27,7 +27,7 @@ import org.robolectric.annotation.GraphicsMode
  * Screenshot tests of the submit flow (B3, spec §6): review, the already-complete / already-sent dialogs, uploading,
  * success and the problem dialogs. FAKE data. Kept in its own file so other issues' catalogs don't collide with it.
  */
-abstract class SubmitCatalog(private val device: String) {
+abstract class InspectionSubmitCatalog(private val device: String) {
     @get:Rule val compose = createComposeRule()
 
     private fun shot(name: String, phase: InspectionSubmitPhase) {
@@ -78,10 +78,10 @@ abstract class SubmitCatalog(private val device: String) {
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w1280dp-h800dp-land-mdpi")
-class SubmitTabletScreenshots : SubmitCatalog("tablet")
+class InspectionSubmitTabletScreenshots : InspectionSubmitCatalog("tablet")
 
 /** Phone, portrait. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-mdpi")
-class SubmitPhoneScreenshots : SubmitCatalog("phone")
+class InspectionSubmitPhoneScreenshots : InspectionSubmitCatalog("phone")
