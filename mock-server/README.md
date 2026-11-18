@@ -53,6 +53,7 @@ Serial numbers are `25X0000001` … `25X0000014`.
   tablet save gets `409 RMA_CHANGED`. Body (any subset):
   `{"header": {"credit_status": "P - Partial Warranty Credit"}, "summary": {"blocks": {"2": "typed at the desk"}},
   "parts": [{"part_code": {"group": null, "code": "44"}, "issue_code": {"group": null, "code": "46"}, "cause_code": null, "note": ""}],
+- `POST /report` builds a real demo PDF (`mock_server/report_pdf.py`, ReportLab + Pillow): disposition letter, report page, photo pages from the report photos actually stored.
   "report_pics": ["01-1 Example.jpg"]}`
 - `POST /api/v1/_mock/rmas/{rma}/lock` — body `{"locked": true, "held_by": "JDOE2", "possibly_stale": false}`
 - `POST /api/v1/_mock/rmas/{rma}/report-in-use` — body `{"in_use": true}`

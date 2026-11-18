@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse
 
 from . import fake_data as fd
 from . import naming
+from .report_pdf import build_report_pdf
 
 API_VERSION = "1.0"
 SERVER_VERSION = "0.2.0-mock"
@@ -797,27 +798,21 @@ async def put_report_pics(rma_id: str, request: Request):
 
 # --- report
 
-def _fake_pdf(title: str, pages: int) -> bytes:
-    """Minimal valid PDF (mock only)."""
-    objs = ["<< /Type /Catalog /Pages 2 0 R >>"]
-    kids = " ".join(f"{3 + i * 2} 0 R" for i in range(pages))
-    objs.append(f"<< /Type /Pages /Kids [{kids}] /Count {pages} >>")
-    for i in range(pages):
-        text = f"BT /F1 18 Tf 72 720 Td ({title} - page {i + 1} of {pages}) Tj ET".encode()
-        objs.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {4 + i * 2} 0 R "
-                    f"/Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>")
-        objs.append(f"<< /Length {len(text)} >>\nstream\n{text.decode()}\nendstream")
-    out = bytearray(b"%PDF-1.4\n")
-    offsets = []
-    for n, o in enumerate(objs, start=1):
-        offsets.append(len(out))
-        out += f"{n} 0 obj\n{o}\nendobj\n".encode()
-    xref = len(out)
-    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
-    for off in offsets:
-        out += f"{off:010d} 00000 n \n".encode()
-    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
-    return bytes(out)
+def _report_data(rma: dict) -> dict:
+    h, s = rma["header"], summary_view(rma)
+    parts = []
+    for p in parts_view(rma):
+        pc, ic = p["part_code"], p["issue_code"]
+        parts.append({"part": f"{pc['code']} - {pc['description']}" if pc else "",
+                      "issue": f"{ic['code']} - {ic['description']}" if ic else "", "note": p["note"]})
+    dc = s["defect_code"]
+    return {"rma": rma["display_number"], "model": h["model"], "serial": h["failed_serial_no"],
+            "customer_name": h["customer_name"], "failed_date": h["failed_date"],
+            "generated_date": datetime.now(EASTERN).strftime("%m/%d/%Y"), "return_code": h["return_code"],
+            "status": h["inspection_status"], "credit_status": h["credit_status"],
+            "inspected_by": s["inspected_by"], "summary_by": s["summary_by"], "parts": parts,
+            "diagnosis": f"{dc['code']} - {dc['description']}" if dc else "",
+            "summary": "\n\n".join(b["text"] for b in s["blocks"] if b["text"])}
 
 
 @api.post("/rmas/{rma_id}/report")
@@ -846,8 +841,9 @@ async def build_report(rma_id: str, request: Request):
         if not any(rma["summary"]["blocks"].values()):
             warnings.append({"code": "EMPTY_SUMMARY", "message": "The summaries are empty."})
         photo_count = len(rma["report_pics"])
-        pages = 2 + math.ceil(photo_count / 6)
-        pdf = _fake_pdf(f"MOCK REPORT RMA {num}", pages)
+        pdf, pages = build_report_pdf(_report_data(rma), [
+            (name.rsplit(".", 1)[0], store.files.get((rma["rma_id"], "report", name), b""))
+            for name in naming.natural_sorted(rma["report_pics"])])
         previous = rma["report"] is not None
         rma["report"] = {"generated_at": now(), "pdf": pdf, "pages": pages, "xlsx_bytes": 8800}
         # First successful build sets Report Complete (audited); later builds only regenerate (decision 2026-11-18).
