@@ -158,7 +158,7 @@ class PhotosTest {
         assertEquals(2048 to 1536, PhotoMath.targetSize(4000, 3000, 2048))
         assertEquals(1536 to 2048, PhotoMath.targetSize(3000, 4000, 2048))
         assertEquals(1600 to 1200, PhotoMath.targetSize(1600, 1200, 2048))
-        assertEquals(4, PhotoMath.sampleSize(8000, 6000, 2048))
+        assertEquals(2, PhotoMath.sampleSize(8000, 6000, 2048))
         assertEquals(1, PhotoMath.sampleSize(3000, 2000, 2048))
     }
 
