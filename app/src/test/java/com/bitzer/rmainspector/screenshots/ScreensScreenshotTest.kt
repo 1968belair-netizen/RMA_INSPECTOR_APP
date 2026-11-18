@@ -8,6 +8,8 @@ import com.bitzer.rmainspector.ui.home.HomeState
 import com.bitzer.rmainspector.ui.rma.OverviewState
 import com.bitzer.rmainspector.ui.rma.RmaOverviewContent
 import com.bitzer.rmainspector.ui.settings.SettingsScreen
+import com.bitzer.rmainspector.ui.signin.SignInContent
+import com.bitzer.rmainspector.ui.signin.SignInState
 import com.bitzer.rmainspector.ui.theme.RmaInspectorTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -36,6 +38,15 @@ abstract class ScreenCatalog(private val device: String) {
             onQueryChange = {}, onSearch = {}, onClearSearch = {}, onToggleStatus = {}, onRefreshWorkList = {},
             onOpenSettings = {}, onRetryServer = {}, onOpenRma = {})
 
+    @Composable
+    private fun signIn(state: SignInState) =
+        SignInContent(state, onUsernameChange = {}, onPasswordChange = {}, onSignIn = {}, onOpenSettings = {}, onRetryServer = {})
+
+    @Test fun signin_empty() = shot("signin_empty") { signIn(ScreenshotData.signInEmpty) }
+    @Test fun signin_error() = shot("signin_error") { signIn(ScreenshotData.signInError) }
+    @Test fun signin_signing_in() = shot("signin_signing_in") { signIn(ScreenshotData.signInBusy) }
+    @Test fun signin_offline() = shot("signin_offline") { signIn(ScreenshotData.signInOffline) }
+
     @Test fun home_default() = shot("home_default") { home(ScreenshotData.homeDefault) }
     @Test fun home_search_results() = shot("home_search_results") { home(ScreenshotData.homeSearch) }
     @Test fun home_empty() = shot("home_empty") { home(ScreenshotData.homeEmpty) }
@@ -47,7 +58,7 @@ abstract class ScreenCatalog(private val device: String) {
     @Test fun rma_not_found() = shot("rma_not_found") { RmaOverviewContent(OverviewState.Error("RMA 999 was not found.", notFound = true), {}, {}) }
 
     @Test fun settings() = shot("settings") {
-        SettingsScreen(ScreenshotData.appOk, onBack = {}, onSaveServer = { null }, onResetServer = {}, onTest = {}, onSelectInspector = {})
+        SettingsScreen(ScreenshotData.appOk, onBack = {}, onSaveServer = { null }, onResetServer = {}, onTest = {}, onSignOut = {})
     }
 }
 

@@ -9,14 +9,16 @@ import com.bitzer.rmainspector.core.ServerUrl
 import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.AppSettings
 import com.bitzer.rmainspector.data.Health
-import com.bitzer.rmainspector.data.Inspector
 import com.bitzer.rmainspector.data.ServiceLocator
+import com.bitzer.rmainspector.data.Session
+import com.bitzer.rmainspector.data.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface Connection {
@@ -26,31 +28,47 @@ sealed interface Connection {
     data class Error(val message: String) : Connection
 }
 
+/** Sign-in form progress (spec §2). */
+data class SignInProgress(
+    val signingIn: Boolean = false,
+    val error: String? = null,
+)
+
 data class AppUiState(
     val settings: AppSettings? = null,
     val connection: Connection = Connection.Unknown,
-    val inspectors: List<Inspector> = emptyList(),
+    /** The signed-in user; null = show the sign-in screen. Initials pre-fill Inspected by / Summary by. */
+    val user: User? = null,
+    val signIn: SignInProgress = SignInProgress(),
 ) {
-    /** More than one inspector on the server and none chosen yet → show "Who's inspecting?". */
-    val needsInspectorPick: Boolean get() = inspectors.size > 1 && settings?.inspector == null
+    val signedIn: Boolean get() = user != null
 }
 
-/** App-wide state: server address, connection, inspector (spec §2, §3.1, §3.14). */
+/** App-wide state: server address, connection, signed-in user (spec §2, §3.14). */
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = ServiceLocator.settings(app)
+    private val auth = ServiceLocator.auth(app)
     private val api = ServiceLocator.api
     private val connection = MutableStateFlow<Connection>(Connection.Unknown)
-    private val inspectors = MutableStateFlow<List<Inspector>>(emptyList())
+    private val signIn = MutableStateFlow(SignInProgress())
 
-    val state: StateFlow<AppUiState> = combine(store.settings, connection, inspectors) { s, c, i ->
-        AppUiState(settings = s, connection = c, inspectors = i)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState())
+    /** Last username, to pre-fill the sign-in form (not secret). */
+    val lastUsername: String get() = auth.lastUsername
+
+    val state: StateFlow<AppUiState> = combine(store.settings, connection, auth.session, signIn) { s, c, session, p ->
+        AppUiState(settings = s, connection = c, user = session?.user, signIn = p)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        // The stored session is read synchronously, so the first frame already knows whether to show sign-in.
+        AppUiState(user = auth.session.value?.user),
+    )
 
     init {
         refresh()
     }
 
-    /** Re-check the server and reload the inspector list. */
+    /** Re-check the server (reachability + version). Refreshes the signed-in user's name/initials if possible. */
     fun refresh() {
         viewModelScope.launch {
             val settings = store.settings.first()
@@ -65,20 +83,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     updateRequired = !AppVersion.isAtLeast(BuildConfig.VERSION_NAME, h.value.minAppVersion),
                 )
             }
-            when (val r = api.inspectors(settings.serverUrl)) {
-                is ApiResult.Failure -> connection.value = Connection.Error(r.message)
-                is ApiResult.Ok -> {
-                    val list = r.value.inspectors
-                    inspectors.value = list
-                    val current = settings.inspector
-                    when {
-                        list.size == 1 && current?.username != list[0].username -> store.setInspector(list[0])
-                        current != null -> list.firstOrNull { it.username.equals(current.username, true) }
-                            ?.let { if (it != current) store.setInspector(it) }
-                            ?: store.setInspector(null) // removed from the server's list
-                    }
-                }
+            val session = auth.session.value ?: return@launch
+            // A 401 here signs the user out via ApiClient → AuthStore.expire.
+            (api.me(settings.serverUrl) as? ApiResult.Ok)?.value?.let { user ->
+                if (user != session.user && auth.session.value?.token == session.token) auth.save(session.copy(user = user))
             }
+        }
+    }
+
+    fun signIn(username: String, password: String) {
+        if (signIn.value.signingIn) return
+        if (username.isBlank() || password.isEmpty()) {
+            signIn.value = SignInProgress(error = "Enter your username and password.")
+            return
+        }
+        viewModelScope.launch {
+            signIn.value = SignInProgress(signingIn = true)
+            val base = store.settings.first().serverUrl
+            when (val r = api.login(base, username, password, auth.deviceId)) {
+                is ApiResult.Ok -> {
+                    auth.save(Session(r.value.token, r.value.user))
+                    signIn.value = SignInProgress()
+                }
+                is ApiResult.Failure -> signIn.value = SignInProgress(error = r.message)
+            }
+        }
+    }
+
+    fun clearSignInError() = signIn.update { it.copy(error = null) }
+
+    /** Settings → Sign out. Forgets the token first, then tells the server (best effort). Queued work is kept. */
+    fun signOut() {
+        val session = auth.session.value ?: return
+        auth.clear()
+        viewModelScope.launch {
+            api.logout(store.settings.first().serverUrl, session.token)
         }
     }
 
@@ -87,7 +126,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val url = ServerUrl.normalize(text) ?: return "That doesn't look like a server address. Example: 192.168.1.20:8000"
         viewModelScope.launch {
             store.setServerUrl(url)
-            inspectors.value = emptyList()
             refresh()
         }
         return null
@@ -98,9 +136,5 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             store.setServerUrl(BuildConfig.DEFAULT_SERVER_URL)
             refresh()
         }
-    }
-
-    fun selectInspector(inspector: Inspector) {
-        viewModelScope.launch { store.setInspector(inspector) }
     }
 }

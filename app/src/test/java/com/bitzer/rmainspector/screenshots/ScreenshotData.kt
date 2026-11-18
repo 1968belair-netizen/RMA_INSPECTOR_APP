@@ -6,7 +6,6 @@ import com.bitzer.rmainspector.data.Code
 import com.bitzer.rmainspector.data.CodeKey
 import com.bitzer.rmainspector.data.Flag
 import com.bitzer.rmainspector.data.Health
-import com.bitzer.rmainspector.data.Inspector
 import com.bitzer.rmainspector.data.LockState
 import com.bitzer.rmainspector.data.PartRow
 import com.bitzer.rmainspector.data.PhotoFolder
@@ -15,26 +14,35 @@ import com.bitzer.rmainspector.data.RmaHeader
 import com.bitzer.rmainspector.data.RmaListItem
 import com.bitzer.rmainspector.data.Summary
 import com.bitzer.rmainspector.data.SummaryBlock
+import com.bitzer.rmainspector.data.User
 import com.bitzer.rmainspector.ui.AppUiState
 import com.bitzer.rmainspector.ui.Connection
+import com.bitzer.rmainspector.ui.SignInProgress
 import com.bitzer.rmainspector.ui.home.HomeState
 import com.bitzer.rmainspector.ui.home.SearchState
 import com.bitzer.rmainspector.ui.home.WorkListState
+import com.bitzer.rmainspector.ui.signin.SignInState
 
 /** FAKE data for screenshots — mirrors the mock server's fake RMAs. */
 object ScreenshotData {
     private fun c(code: String, desc: String = code) = Code(null, code, desc)
 
-    val inspector = Inspector("demo", "Demo Inspector", "DI", "DEMO_SQL")
+    val user = User("demo", "Demo Inspector", "DI", "DEMO_SQL", listOf("all"))
     val health = Health(status = "ok", apiVersion = "1.0", serverVersion = "0.2.0-mock", minAppVersion = "0.1.0", backend = "mock",
         backendReachable = true, photoStoreReachable = true)
 
     val appOk = AppUiState(
-        settings = AppSettings("http://10.0.2.2:8000/api/v1", inspector),
+        settings = AppSettings("http://10.0.2.2:8000/api/v1"),
         connection = Connection.Ok(health, updateRequired = false),
-        inspectors = listOf(inspector),
+        user = user,
     )
     val appOffline = appOk.copy(connection = Connection.Error("Can't reach the server at http://10.0.2.2:8000/api/v1. Check the address in Settings and that this device is on the same network."))
+
+    // Sign-in screen (spec §2). Fixed app version so screenshots don't change with every CI run number.
+    val signInEmpty = SignInState(serverUrl = "http://10.0.2.2:8000/api/v1", connection = appOk.connection, appVersion = "0.1.0")
+    val signInError = signInEmpty.copy(username = "demo", password = "wrong", progress = SignInProgress(error = "Wrong username or password."))
+    val signInBusy = signInEmpty.copy(username = "demo", password = "demo", progress = SignInProgress(signingIn = true))
+    val signInOffline = signInEmpty.copy(connection = appOffline.connection)
 
     private fun item(id: String, model: String, type: String, key: String, rc: String, since: String,
                      estimated: Boolean = false, locked: Boolean = false, flags: List<Flag> = emptyList(), serial: String = "") =
