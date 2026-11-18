@@ -112,6 +112,17 @@ class PhotoStore(private val root: File) {
             write(username, rmaId, all.map { if (it.photoId == photoId) it.copy(sentAt = now, serverFilename = serverFilename) else it })
         }
 
+    /**
+     * After a submit the server gives the parts rows new `row_id`s: photos of a row follow it. [mapping] = old
+     * [LocalPhoto.rowLocalId] → new one; photos of other rows stay as they are.
+     */
+    fun remapRows(username: String, rmaId: String, mapping: Map<String, String>) = synchronized(lock) {
+        if (mapping.isEmpty()) return@synchronized
+        val all = read(username, rmaId)
+        if (all.none { it.rowLocalId in mapping }) return@synchronized
+        write(username, rmaId, all.map { p -> p.rowLocalId?.let { mapping[it] }?.let { p.copy(rowLocalId = it) } ?: p })
+    }
+
     /** Removes sent photos older than [days] days (spec §6.3). Returns how many went. */
     fun purgeSent(username: String, rmaId: String, now: Instant = Instant.now(), days: Long = KEEP_SENT_DAYS): Int =
         synchronized(lock) {

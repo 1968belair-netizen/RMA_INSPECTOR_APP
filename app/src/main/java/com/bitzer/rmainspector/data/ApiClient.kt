@@ -151,6 +151,45 @@ class ApiClient(
             }
         }
 
+
+    // --- Submit report (C2, api §7 summary-only, §9.3-9.7)
+
+    /** `POST /spellcheck` (api §9.6). */
+    suspend fun spellcheck(baseUrl: String, text: String): ApiResult<SpellcheckResponse> =
+        send(url(baseUrl, "spellcheck"), baseUrl, SpellcheckResponse.serializer(),
+            writeJson.encodeToString(SpellcheckRequest.serializer(), SpellcheckRequest(text)).toRequestBody(JSON_TYPE))
+
+    /** `POST /spellcheck/dictionary` (api §9.7). */
+    suspend fun addToDictionary(baseUrl: String, word: String): ApiResult<DictionaryAdded> =
+        send(url(baseUrl, "spellcheck", "dictionary"), baseUrl, DictionaryAdded.serializer(),
+            writeJson.encodeToString(DictionaryRequest.serializer(), DictionaryRequest(word)).toRequestBody(JSON_TYPE))
+
+    /** `POST /rmas/{id}/inspection` with the summary only (status and parts unchanged). */
+    suspend fun saveSummary(baseUrl: String, rmaId: String, request: SummaryOnlyRequest): ApiResult<SummarySaved> =
+        send(url(baseUrl, "rmas", rmaId, "inspection"), baseUrl, SummarySaved.serializer(),
+            writeJson.encodeToString(SummaryOnlyRequest.serializer(), request).toRequestBody(JSON_TYPE))
+
+    /** `POST /rmas/{id}/report` (api §9.3). The tablet waits up to 120 s. */
+    suspend fun buildReport(baseUrl: String, rmaId: String, request: BuildRequest): ApiResult<BuildResponse> =
+        send(url(baseUrl, "rmas", rmaId, "report"), baseUrl, BuildResponse.serializer(),
+            writeJson.encodeToString(BuildRequest.serializer(), request).toRequestBody(JSON_TYPE),
+            callClient = http.newBuilder().readTimeout(120, TimeUnit.SECONDS).build())
+
+    /** `GET /rmas/{id}/report/pdf` (api §9.5) — the PDF bytes for the preview. */
+    suspend fun reportPdf(baseUrl: String, rmaId: String): ApiResult<ByteArray> = withContext(Dispatchers.IO) {
+        val url = url(baseUrl, "rmas", rmaId, "report", "pdf")
+            ?: return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
+        val token = tokenProvider()
+        try {
+            http.newCall(requestBuilder(url, token).header("Accept", "application/pdf").build()).execute().use { resp ->
+                if (resp.isSuccessful) ApiResult.Ok(resp.body?.bytes() ?: ByteArray(0))
+                else errorResult(resp.code, resp.body?.string().orEmpty(), token, reportUnauthorized = true)
+            }
+        } catch (e: IOException) {
+            unreachable(baseUrl)
+        }
+    }
+
     suspend fun <T> get(
         url: HttpUrl?,
         baseUrl: String,
@@ -162,7 +201,7 @@ class ApiClient(
      * [authorized] false = no stored token is sent (login); [explicitToken] overrides the stored token.
      */
     @Suppress("UNCHECKED_CAST")
-    private suspend fun <T> send(
+    internal suspend fun <T> send(
         url: HttpUrl?,
         baseUrl: String,
         deserializer: DeserializationStrategy<T>?,
@@ -170,6 +209,7 @@ class ApiClient(
         authorized: Boolean = true,
         explicitToken: String? = null,
         httpMethod: String = "POST",
+        callClient: OkHttpClient? = null,
     ): ApiResult<T> = withContext(Dispatchers.IO) {
         if (url == null) {
             return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
@@ -177,7 +217,7 @@ class ApiClient(
         val token = explicitToken ?: if (authorized) tokenProvider() else null
         val request = requestBuilder(url, token).apply { if (body != null) method(httpMethod, body) }.build()
         try {
-            http.newCall(request).execute().use { resp ->
+            (callClient ?: http).newCall(request).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (resp.isSuccessful) {
                     if (deserializer == null) return@use ApiResult.Ok(Unit as T)

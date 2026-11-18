@@ -67,6 +67,8 @@ data class WorkspaceState(
     val photos: PhotosState = PhotosState(),
     /** Report tab data (C1); filled by [ReportViewModel], passed in by [WorkspaceScreen]. */
     val report: ReportState = ReportState(),
+    /** Submit flow (B3); filled by [SubmitViewModel], passed in by [WorkspaceScreen]. */
+    val submit: InspectionSubmitPhase = InspectionSubmitPhase.Closed,
 ) {
     val rma: RmaDetail? get() = (load as? WorkspaceLoad.Loaded)?.rma
     val banners: List<WorkspaceBanner> get() = rma?.let { workspaceBanners(it, changedElsewhere) }.orEmpty()
