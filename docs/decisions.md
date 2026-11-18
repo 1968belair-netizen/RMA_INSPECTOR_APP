@@ -3,6 +3,18 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Upload queue and sign-out (Jacob, for #9)
+1. **Wording:** sign-out clears the **session and screen history** but **never the upload queue**.
+2. **Held uploads:** queued uploads of a signed-out inspector are held on the tablet until **that same inspector**
+   signs in again. Never sent under another user's token, never re-attributed.
+3. **Sign out with waiting uploads:** "You have N uploads waiting. Send now before signing out?" — buttons
+   **Send now** / **Sign out anyway**. Send now uploads first (shows progress), then signs out; if offline it says
+   so and offers Sign out anyway.
+4. **Sign in with held uploads:** show "N uploads waiting from your earlier session" and send them automatically.
+5. **Settings → Upload queue:** held items grouped by inspector; read-only for other users (they see that items
+   are waiting, but cannot open or send them).
+- Reflected in: spec §2 and §6.6; acceptance criteria of #9 (incl. an emulator test for user A / user B).
+
 ## 2026-11-18 — Sign-in answers (Jacob, from docs/questions.md #1–2)
 - **Token storage (approved):** the session token is encrypted with AES-256-GCM using a non-exportable Android
   Keystore key, no extra library (`data/AuthStore.kt`). **Only the token (and the user's name/initials) is stored —
@@ -12,8 +24,7 @@ Newest first. Each entry: date, decision, where it is reflected. Planning happen
   possible). Back on the sign-in screen leaves the app rather than skipping sign-in. Explicit Sign out still clears
   the screen history.
 - **Queued work keeps its inspector:** if a different user signs in, work already queued keeps the original
-  inspector's identity (user, initials) and is **never re-attributed**. Applies to the upload queue (#9) — each
-  queued item stores who made it at the time it was made.
+  inspector's identity (user, initials) and is **never re-attributed** (refined in the next entry).
 - Reflected in: spec §2, `AuthStore.expired`, `RmaInspectorApp.kt` navigation, `AuthStoreTest`, emulator
   `SmokeTest.reSignInReturnsToTheSameRma`.
 

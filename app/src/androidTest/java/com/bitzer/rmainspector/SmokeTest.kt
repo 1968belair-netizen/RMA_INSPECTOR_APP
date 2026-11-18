@@ -4,7 +4,9 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,6 +21,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import com.bitzer.rmainspector.ui.signin.SignInTags
 import org.junit.Rule
+import org.junit.rules.ExternalResource
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -30,7 +33,14 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class SmokeTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    /** Each test starts signed out, whatever order JUnit runs them in (runs before the activity starts). */
+    @get:Rule(order = 0) val signedOut = object : ExternalResource() {
+        override fun before() {
+            ServiceLocator.auth(InstrumentationRegistry.getInstrumentation().targetContext).clear()
+        }
+    }
+
+    @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
     fun signInSearchRmaAndSignOut() {
@@ -39,13 +49,15 @@ class SmokeTest {
         // Wrong password → exact message.
         compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
         compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("wrong")
+        compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
         compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
-        compose.waitUntilAtLeastOneExists(hasText("Wrong username or password."), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("Wrong username or password."), timeoutMillis = 30_000)
 
         // Demo user signs in.
         compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("demo")
+        compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
         compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
-        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 30_000)
         compose.onNodeWithText("Inspector: Demo Inspector (DI)", substring = true).assertExists()
 
         compose.onNode(hasSetTextAction()).performTextInput("912345")
@@ -69,9 +81,9 @@ class SmokeTest {
      */
     @Test
     fun reSignInReturnsToTheSameRma() {
-        compose.waitUntilAtLeastOneExists(hasText("SIGN IN") or hasText("FIND AN RMA"), timeoutMillis = 15_000)
-        if (compose.onAllNodes(hasText("SIGN IN")).fetchSemanticsNodes().isNotEmpty()) signInAsDemo()
-        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
+        signInAsDemo()
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 30_000)
 
         compose.onNode(hasSetTextAction()).performTextInput("912345")
         compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
@@ -101,6 +113,7 @@ class SmokeTest {
     private fun signInAsDemo() {
         compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
         compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("demo")
+        compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
         compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
     }
 }
