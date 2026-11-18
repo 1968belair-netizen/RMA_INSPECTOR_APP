@@ -93,9 +93,32 @@ jobs:
             --title "Latest build (0.1.${{ github.run_number }})" \
             --notes "Debug build of main at ${GITHUB_SHA::7}. Install on the test tablet: download the APK on the tablet and open it."
 
+  changes:
+    # Rapid mode (2026-11-18): emulator tests only for PRs that change navigation, sign-in, submit or the upload
+    # queue (or the emulator tests / this workflow). Label a PR `emulator` to force them; manual runs always run them.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      emulator: ${{ steps.f.outputs.emulator }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: f
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'emulator') }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$FORCE" = "true" ] || [ -z "$BASE" ]; then echo "emulator=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "$BASE"...HEAD)
+          echo "$files"
+          pattern='(ui/RmaInspectorApp\.kt|MainActivity\.kt|/ui/signin/|AuthStore\.kt|ApiClient\.kt|[Ss]ubmit|[Qq]ueue|[Uu]pload|^app/src/androidTest/|^\.github/workflows/android\.yml)'
+          if echo "$files" | grep -Eq "$pattern"; then echo "emulator=true" >> "$GITHUB_OUTPUT"; else echo "emulator=false" >> "$GITHUB_OUTPUT"; fi
+
   emulator:
     # UI tests on an Android emulator against the mock server (PRs and manual runs only, to save Actions minutes).
-    if: github.event_name != 'push'
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.emulator == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

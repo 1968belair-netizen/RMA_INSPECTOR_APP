@@ -54,16 +54,28 @@ The real app server (`server/`) is added later in a local session (Phase 4).
   **locally** on Jacob's laptop (never in a cloud session).
 - One issue → one branch (from the latest `main`) → PR using the template (3-line **Summary**) → Actions green.
 - **Standing approval:** merge (squash) when Actions is green **and** every acceptance item in the issue is met.
-- Up to **3 issues in parallel**. Branch from `main` only after the PRs you depend on are merged.
+- Branch from `main` only after the PRs you depend on are merged.
 - A decision the docs don't cover → add it to `docs/questions.md` (with a recommended option), keep working on
   other issues. Record answered decisions in `docs/decisions.md`.
-- Jacob tests on a tablet at the **end of each milestone**; post a milestone report (done, screenshots, APK link,
-  test results, known gaps, questions).
 - Commit messages: short imperative summary line.
 - **Commit and push at least after every meaningful step**, so a usage-limit pause never strands work locally.
 - **Before stopping, or when told a limit is near**, write a short "where I left off" comment on the issue: what's
   done, the next step, and the branch name.
 - **When resuming**, read the issue's latest comment first.
+
+### Rapid development mode (decided 2026-11-18, overrides the rules above where they differ)
+1. Keep **3 issues in progress at all times**. Start work that doesn't depend on unfinished issues (e.g. milestone C
+   Report tab against the mock while B runs); only work that truly depends on another issue waits for it.
+2. **Don't pause between milestones.** Post a short milestone report and keep going; Jacob tests several milestones
+   together on his phone.
+3. **Emulator tests only on PRs that change navigation, sign-in, submit or the upload queue** (CI decides from the
+   changed paths; label a PR `emulator` to force). Every PR still runs unit and screenshot tests.
+4. **Implementation threads use Sonnet**; switch a thread to Opus only when it's stuck after two attempts.
+5. **PR summaries: 3 lines max.** Milestone reports are the only detailed reports.
+6. **Never wait on Jacob.** Undecided items go to `docs/questions.md` with the recommended option already built;
+   keep working.
+7. **Stop only for:** a failed check you can't fix after two attempts, a change that would break a hard rule above,
+   or a usage limit (leave a "where I left off" comment on the issue).
 
 ## Screenshot tests (every PR)
 - Roborazzi on Robolectric, JVM only: `app/src/test/java/com/bitzer/rmainspector/screenshots/`.
@@ -73,7 +85,8 @@ The real app server (`server/`) is added later in a local session (Phase 4).
 - CI runs `./gradlew assembleDebug recordRoborazziDebug`, publishes PNGs to the `screenshots` branch and comments on
   the PR with the screens that changed versus `main` plus the PR's Summary lines.
 - Emulator tests: `app/src/androidTest/` (Compose UI tests), run in Actions on an API 34 tablet emulator against the
-  mock server at `10.0.2.2:8000` (`connectedDebugAndroidTest`). PRs only — keep them few and focused (Actions minutes).
+  mock server at `10.0.2.2:8000` (`connectedDebugAndroidTest`). PRs only, and only when the PR changes navigation, sign-in, submit, the upload
+  queue, the emulator tests or the workflow (job `changes` decides; label `emulator` forces). Keep them few and focused.
 
 ## Style
 - UI follows the BITZER Style Guide: BITZER Green `#3AAA35` primary, Dark green `#005B23`, greys; headlines in
