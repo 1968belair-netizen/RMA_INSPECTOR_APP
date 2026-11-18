@@ -14,21 +14,19 @@ In parallel: `#45 M1` mock PDF, `#46 M2` demo dataset + checklist; then `#20 D2`
 ### Open PRs
 | PR | Issue | Branch | State |
 |---|---|---|---|
-| #40 | #10 C1 Report tab | `feature/c1-report-tab` | **owned by the old session — do not touch** until merged or it stops, then take over. |
+| #40 | #10 C1 Report tab | `feature/c1-report-tab` | **taken over by the coordinator (14:15 ET)** — old session stopped. Rebased on main (`d305132`); CI re-running. Merge when green. |
 | #44 | #7 B2 Photos | `feature/b2-photos` | thread fixing build failure + conflict with main (after #43). |
-| (coming) | #45 M1 mock report PDF | `feature/m1-report-pdf` | thread started 14:05 ET |
-| (coming) | #46 M2 demo dataset/checklist | `feature/m2-demo-dataset` | thread started 14:05 ET |
-| (docs) | — | `docs/demo-plan` | this update; labelled `emulator` to run emulator tests on main (A6 + B1 together). |
 
-**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (91cbe41; needs a real-tablet test) · #42 docs.
+**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 docs · #49 M1 mock report PDF · #48 M2 demo dataset + checklist + run script · #47 demo-plan docs.
+**Emulator tests on main (A6 + B1 together): ✅ passed** (run on PR #47, 2026-11-18 14:12 ET).
 
 ### Open issues
 | Issue | Milestone | State | Depends on |
 |---|---|---|---|
-| #7 B2 Photos | B | PR #44 | B1 ✅ |
+| #7 B2 Photos | B | PR #44 (conflicts with main; thread rebasing) | B1 ✅ |
 | #10 C1 Report tab | C | PR #40 (old session) | — |
-| #45 M1 Mock report PDF | E Demo | in progress | — |
-| #46 M2 Demo dataset + checklist + run script | E Demo | in progress | — |
+| #45 M1 Mock report PDF | E Demo | **done** (#49) | — |
+| #46 M2 Demo dataset + checklist + run script | E Demo | **done** (#48) | — |
 | #8 B3 Submit inspection | B | not started (banner only for offline; no queue edge cases) | B2 |
 | #11 C2 Submit report | C | not started | B3, C1 |
 | #20 D2 Guided inspection | D | not started — if time allows | B2, #46 checklist |
@@ -41,7 +39,7 @@ In parallel: `#45 M1` mock PDF, `#46 M2` demo dataset + checklist; then `#20 D2`
 1. When #44 is green and acceptance met → attempt the merge (Jacob approves); if blocked post "READY TO MERGE: #n".
 2. After B2 merges start #8 B3 (and #20 D2 once #46 merges). After B3 + C1 merge start #11 C2.
 3. When the loop works: write `docs/demo.md` (setup + 5-minute tap-by-tap script), then post DEMO READY.
-4. Worktrees used by threads: `/home/claude/wt-b2`, `/home/claude/wt-m1`, `/home/claude/wt-m2` (session-local).
+4. Worktrees used by threads: `/home/claude/wt-b2`, `/home/claude/wt-c1` (session-local).
 
 ## 3. Rapid-mode rules in force (CLAUDE.md → Workflow → Rapid development mode)
 1. Keep **3 issues in progress at all times**. Start independent work now (C against the mock); only truly
