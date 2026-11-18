@@ -9,6 +9,11 @@ import com.bitzer.rmainspector.data.DeletedRow
 import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.toFindingRows
 import com.bitzer.rmainspector.data.Flag
+import com.bitzer.rmainspector.data.LocalPhoto
+import com.bitzer.rmainspector.data.ServerPhoto
+import com.bitzer.rmainspector.ui.workspace.PhotosState
+import com.bitzer.rmainspector.ui.workspace.TagPickerState
+import com.bitzer.rmainspector.ui.workspace.WorkspaceTab
 import com.bitzer.rmainspector.data.Health
 import com.bitzer.rmainspector.data.LockState
 import com.bitzer.rmainspector.data.PartRow
@@ -158,9 +163,28 @@ object ScreenshotData {
         )
     }
     private val findingsBase = FindingsState(rows = findingRows, hasDraft = true, codes = findingCodes,
-        recentParts = listOf(CodeKey(null, "63"), CodeKey(null, "48a")), photoCounts = mapOf("new-1" to 2))
-    val workspaceFindings = workspace.copy(findings = findingsBase)
+        recentParts = listOf(CodeKey(null, "63"), CodeKey(null, "48a")))
+    // --- Photos (B2). Fake files only; tiles show placeholders in screenshots.
+    private fun lp(id: String, row: String? = null, tag: String? = null, text: String? = null) = LocalPhoto(
+        photoId = id, kind = if (row != null) LocalPhoto.KIND_PART else LocalPhoto.KIND_RMA, rowLocalId = row, tag = tag, tagText = text,
+        capturedAt = "2026-11-17T10:49:02-05:00", file = "$id.jpg")
+    private val photosServer = listOf(
+        ServerPhoto("00-1 As received.jpg", seq = 0),
+        ServerPhoto("00-2 Nameplate.jpg", seq = 0),
+        ServerPhoto("01-1 Terminal box - 50 Normal.jpg", seq = 1, rowId = "L1.sig-1"),
+    )
+    private val photosLocal = listOf(lp("a1", tag = "Overview"), lp("a2", row = "new-1"), lp("a3", row = "new-1"), lp("a4", row = "L2.x"))
+    private val photosState = PhotosState(local = photosLocal, server = photosServer, serverLoaded = true)
+    val workspaceFindings = workspace.copy(findings = findingsBase, photos = photosState)
     val workspaceFindingSheet = workspaceFindings.copy(selection = "new-1")
+    val workspacePhotosGrid = workspaceFindings.copy(tab = WorkspaceTab.PHOTOS)
+    val workspacePhotoSelected = workspacePhotosGrid.copy(selection = "a2")
+    val workspacePhotosEmpty = workspace.copy(tab = WorkspaceTab.PHOTOS, load = WorkspaceLoad.Loaded(rma.copy(parts = emptyList())),
+        findings = FindingsState(rows = emptyList(), codes = findingCodes), photos = PhotosState(serverLoaded = true))
+    val workspacePhotosOffline = workspacePhotosGrid.copy(photos = photosState.copy(server = emptyList(), serverLoaded = false, serverError = "Can't reach the server."))
+    val workspaceTagPicker = workspacePhotosGrid.copy(photos = photosState.copy(tagPicker = TagPickerState(tag = "Other", tagText = "Oil sample")),
+        findings = findingsBase.copy(codes = findingCodes.copy(photoTags = listOf("As received", "Nameplate", "Overview", "Packaging/Freight", "Other"))))
+    val workspaceTagPickerEmpty = workspacePhotosGrid.copy(photos = photosState.copy(tagPicker = TagPickerState()))
     val workspaceFindingsEmpty = workspace.copy(load = WorkspaceLoad.Loaded(rma.copy(parts = emptyList())),
         findings = FindingsState(rows = emptyList(), codes = findingCodes))
     val longNote: String = (1..14).joinToString("\n") { i ->
