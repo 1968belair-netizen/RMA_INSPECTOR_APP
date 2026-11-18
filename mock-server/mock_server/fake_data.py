@@ -210,3 +210,109 @@ def initial_rmas() -> dict:
              status_since="2026-11-16"),
     ]
     return copy.deepcopy({r["rma_id"]: r for r in rmas})
+
+
+# ---------------------------------------------------------------- demo dataset (MOCK_DATASET=demo)
+# 8 curated RMAs on the default work list + one completed example (not on the list: status Report Complete).
+# All FAKE. Dates are relative to "today" so ages stay realistic whenever the demo is run.
+#   912361  Recip, Warranty, 24 d, oil trips                      WL
+#   912362  Recip, Repair & Return, 11 d, core-teardown badge     WL
+#   912363  Recip, Inspection Only, 6 d, misspelled comments      WL
+#   912364  Screw, Warranty, 41 d (aged > 30 days)                WL (oldest)
+#   912365  Screw, Repair & Return, 9 d                           WL
+#   912366  Part, Repair & Return, 15 d                           WL
+#   912367  Transport, Warranty, 4 d (Transport added to the demo work-list defaults)   WL
+#   912368  Scroll, Warranty, 20 d -> read only                   WL
+#   912369  Recip, Inspection Only, Report Complete — finished example (parts, summary, photos, built report)
+DEMO_EXTRA_WORK_LIST_TYPES = ["Transport"]
+
+DEMO_CHECKLIST_VERSION = "2026-11-18-demo"
+
+
+def _step(part, required=True):
+    return {"part_code": code(part), "required": required,
+            "photos": [{"slot": "overall", "label": "Overall", "required_when": "always"},
+                       {"slot": "detail", "label": "Detail", "required_when": "non_normal"}]}
+
+
+def demo_checklists() -> dict:
+    return {
+        "recip": {"version": DEMO_CHECKLIST_VERSION,
+                  "steps": [_step(p) for p in ("07", "48a", "49", "34", "35", "37", "44", "46", "63")]},
+        "screw": {"version": DEMO_CHECKLIST_VERSION,
+                  "steps": [_step(p) for p in ("07", "48a", "34", "35")]},
+    }
+
+
+def demo_rmas(today=None) -> dict:
+    from datetime import date, timedelta
+    today = today or date.today()
+
+    def since(days):
+        return (today - timedelta(days=days)).isoformat()
+
+    def mk(rma, *, customer="Example Refrigeration Co.", sales_order, days, **kw):
+        r = _rma(rma, status_since=since(days), **kw)
+        r["header"]["customer_name"] = customer
+        r["header"]["sales_order_no"] = sales_order
+        r["header"]["failed_date"] = f"{(today - timedelta(days=days + 60)).month}/{(today - timedelta(days=days + 60)).day}/{(today - timedelta(days=days + 60)).year}"
+        return r
+
+    rmas = [
+        mk("912361", model="4FE-28Y", serial="26X0100001", product_type="Recip", status="Received", days=24,
+           sales_order="SO-100061", failure_code="9-Oil Issue",
+           failure_description="Compresser tripped on low oil pressure; scorring suspected on crankshaft journals.",
+           comments="Unit ran about 3 months. Bearring noise before failure."),
+        mk("912362", model="6GE-34Y", serial="26X0100002", product_type="Recip", status="Received", days=11,
+           customer="Sample Cold Storage", sales_order="SO-100062", return_code="Repair & Return",
+           failure_code="2-Motor Grounded", failure_description="Motor grounded on start-up after a power outage.",
+           comments="Termnal plate shows discoloration.", flags=[CORE_TEARDOWN]),
+        mk("912363", model="2KES-05Y", serial="26X0100003", product_type="Recip", status="Received", days=6,
+           customer="Sample Cold Storage", sales_order="SO-100063", return_code="Inspection Only",
+           failure_description="Customer requests inspection after repeated high-pressure cutouts.",
+           comments="Lubercation looked low at the sight glass."),
+        mk("912364", model="HSN7471-75", serial="26X0100004", product_type="Screw", status="Received", days=41,
+           customer="Demo Food Distribution", sales_order="SO-100064", failure_code="9-Oil Issue",
+           failure_description="High oil temperature alarm, then seized rotor."),
+        mk("912365", model="CSH6553-50Y", serial="26X0100005", product_type="Screw", status="Received", days=9,
+           customer="Demo Food Distribution", sales_order="SO-100065", return_code="Repair & Return",
+           failure_description="Excessive noise from the compressor; windng resistance out of range."),
+        mk("912366", model="PART-0002", serial="", product_type="Part", status="Received", days=15,
+           sales_order="SO-100066", return_code="Repair & Return",
+           failure_description="Returned shaft seal kit, leaking at the seal."),
+        mk("912367", model="4NFC-20Y", serial="26X0100007", product_type="Transport", status="Received", days=4,
+           customer="Sample Cold Storage", sales_order="SO-100067",
+           failure_description="Transport compressor arrived with cracked housing cover."),
+        mk("912368", model="GSD60235VAB", serial="26X0100008", product_type="Scroll", status="Received", days=20,
+           sales_order="SO-100068", failure_description="Scroll set noisy at start-up."),
+        mk("912369", model="4PE-15Y", serial="26X0100009", product_type="Recip", status="Report Complete", days=2,
+           customer="Example Refrigeration Co.", sales_order="SO-100069", return_code="Inspection Only",
+           credit="F - Full Warranty Credit", failure_code="2-Motor Grounded",
+           failure_description="Motor grounded; breaker tripped repeatedly.",
+           parts=[row("07a", "50"), row("48a", "50", "Within spec on all 3 phases"),
+                  row("34", "22", "Dark oil, burnt smell"), row("44", "46", "Stator windings burnt on the motor end"),
+                  row("48", "38", "Winding to ground reads 0.2 megohm")],
+           summary={"exists": True, "defect_code": code("07"),
+                    "blocks": {"1": ("The primary failure mode is the winding fault of the stator likely due to overheating. "
+                                     "Failure progression resulted in a ground fault and a tripped breaker. "
+                                     "Common causes for motor overheating include loss of cooling, low refrigerant charge, "
+                                     "electrical imbalance and liquid floodback. "
+                                     "No defects in materials or workmanship were found with this compressor.")},
+                    "inspected_by": "DI", "summary_by": "DI"}),
+    ]
+    return copy.deepcopy({r["rma_id"]: r for r in rmas})
+
+
+DEMO_COMPLETED_RMA = "912369"
+# (filename, label, rgb) - photo names follow docs/spec.md section 5.
+DEMO_COMPLETED_PHOTOS = [
+    ("00-1 As received.jpg", "As received", (120, 130, 140)),
+    ("00-2 Nameplate.jpg", "Nameplate", (200, 200, 190)),
+    ("01-1 Terminal box - 50 Normal.jpg", "Terminal box - Normal", (70, 130, 90)),
+    ("02-1 Oil Condition - 22 Discolored.jpg", "Oil condition - Discolored", (150, 110, 60)),
+    ("03-1 Stator - 46 Burnt.jpg", "Stator - Burnt", (90, 50, 40)),
+    ("03-2 Stator - 46 Burnt.jpg", "Stator detail - Burnt", (110, 60, 45)),
+    ("04-1 Winding to ground insulation - 38 Ground fault.jpg", "Winding ground fault", (60, 80, 140)),
+]
+DEMO_COMPLETED_REPORT_PICS = ["00-1 As received.jpg", "03-1 Stator - 46 Burnt.jpg", "03-2 Stator - 46 Burnt.jpg",
+                              "04-1 Winding to ground insulation - 38 Ground fault.jpg"]
