@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.builtins.ListSerializer
 
 private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
@@ -23,6 +24,7 @@ class SettingsStore(private val context: Context, private val defaultServerUrl: 
         val INSP_NAME = stringPreferencesKey("inspector_display_name")
         val INSP_INITIALS = stringPreferencesKey("inspector_initials")
         val INSP_AUDIT = stringPreferencesKey("inspector_audit_user_id")
+        val WORK_LIST_FILTER = stringPreferencesKey("work_list_filter")
     }
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { it.toSettings() }
@@ -38,6 +40,19 @@ class SettingsStore(private val context: Context, private val defaultServerUrl: 
             )
         },
     )
+
+    /** Remembered work-list status filter; null = never chosen (use the server default). */
+    val workListFilter: Flow<List<CodeKey>?> = context.settingsDataStore.data.map { p ->
+        p[Keys.WORK_LIST_FILTER]?.let { raw ->
+            runCatching { ApiClient.defaultJson.decodeFromString(ListSerializer(CodeKey.serializer()), raw) }.getOrNull()
+        }
+    }
+
+    suspend fun setWorkListFilter(statuses: List<CodeKey>) {
+        context.settingsDataStore.edit {
+            it[Keys.WORK_LIST_FILTER] = ApiClient.writeJson.encodeToString(ListSerializer(CodeKey.serializer()), statuses)
+        }
+    }
 
     suspend fun setServerUrl(url: String) {
         context.settingsDataStore.edit { it[Keys.SERVER] = url }

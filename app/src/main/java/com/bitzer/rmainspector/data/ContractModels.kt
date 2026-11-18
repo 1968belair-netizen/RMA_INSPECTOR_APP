@@ -84,11 +84,19 @@ data class RmaListItem(
     @SerialName("failed_serial_no") val failedSerialNo: String = "",
     @SerialName("product_type") val productType: String = "",
     @SerialName("product_type_key") val productTypeKey: String = "unknown",
+    @SerialName("return_code") val returnCode: Code? = null,
     @SerialName("inspection_status") val inspectionStatus: Code? = null,
+    @SerialName("status_since") val statusSince: String = "",
+    @SerialName("status_since_estimated") val statusSinceEstimated: Boolean = false,
+    val flags: List<Flag> = emptyList(),
     @SerialName("is_open") val isOpen: Boolean = false,
     val inspectable: Boolean = false,
     val locked: Boolean = false,
 )
+
+/** A badge the server wants shown (e.g. CORE_TEARDOWN). Unknown codes are shown by label. */
+@Serializable
+data class Flag(val code: String, val label: String = "")
 
 @Serializable
 data class SearchResponse(
@@ -98,12 +106,18 @@ data class SearchResponse(
 )
 
 @Serializable
+data class WorkListResponse(
+    val results: List<RmaListItem> = emptyList(),
+    @SerialName("generated_at") val generatedAt: String = "",
+)
+
+@Serializable
 data class RmaHeader(
     @SerialName("customer_name") val customerName: String = "",
     val model: String = "",
     @SerialName("failed_serial_no") val failedSerialNo: String = "",
     @SerialName("sales_order_no") val salesOrderNo: String = "",
-    @SerialName("return_code") val returnCode: String = "",
+    @SerialName("return_code") val returnCode: Code? = null,
     @SerialName("inspection_status") val inspectionStatus: Code? = null,
     @SerialName("credit_status") val creditStatus: String = "",
     @SerialName("failed_date") val failedDate: String = "",
