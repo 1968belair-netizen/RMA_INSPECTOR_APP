@@ -45,6 +45,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.bitzer.rmainspector.ui.scan.ScannerScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bitzer.rmainspector.data.Code
@@ -63,6 +66,7 @@ import java.time.LocalDate
 object HomeTags {
     const val SEARCH = "home-search"
     const val COUNT = "home-work-count"
+    const val SCAN = "home-scan"
     fun workItem(rmaId: String) = "work-item-$rmaId"
     fun searchItem(rmaId: String) = "search-item-$rmaId"
 }
@@ -79,6 +83,7 @@ fun HomeScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
+    var scanning by rememberSaveable { mutableStateOf(false) }
 
     // A single search hit opens the RMA straight away (spec §3.3).
     LaunchedEffect(state.openRmaId) {
@@ -92,6 +97,7 @@ fun HomeScreen(
         onQueryChange = { query = it },
         onSearch = { vm.search(query) },
         onClearSearch = { query = ""; vm.clearSearch() },
+        onScan = { scanning = true },
         onToggleProductType = vm::toggleProductType,
         onToggleReturnCode = vm::toggleReturnCode,
         onRefreshWorkList = vm::refreshWorkList,
@@ -99,6 +105,16 @@ fun HomeScreen(
         onRetryServer = onRetryServer,
         onOpenRma = onOpenRma,
     )
+
+    // Camera search (spec §3.1): the scanned text fills the box and runs the search. Only text leaves the scanner.
+    if (scanning) {
+        Dialog(onDismissRequest = { scanning = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            ScannerScreen(
+                onResult = { text -> scanning = false; query = text; vm.search(text) },
+                onClose = { scanning = false },
+            )
+        }
+    }
 }
 
 /** Stateless Home content — used by [HomeScreen] and by screenshot tests. */
@@ -118,6 +134,7 @@ fun HomeContent(
     onRetryServer: () -> Unit,
     onOpenRma: (rmaId: String) -> Unit,
     today: LocalDate = LocalDate.now(),
+    onScan: () -> Unit = {},
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val runSearch = { keyboard?.hide(); onSearch() }
@@ -180,9 +197,8 @@ fun HomeContent(
                                     if (query.isNotEmpty()) {
                                         IconButton(onClick = onClearSearch) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
                                     }
-                                    // Barcode / serial-plate scanning comes in D1 (#19); shown, not usable yet.
-                                    IconButton(onClick = {}, enabled = false) {
-                                        Icon(Icons.Filled.PhotoCamera, contentDescription = "Scan (coming soon)")
+                                    IconButton(onClick = onScan, modifier = Modifier.size(56.dp).testTag(HomeTags.SCAN)) {
+                                        Icon(Icons.Filled.PhotoCamera, contentDescription = "Scan barcode or serial plate")
                                     }
                                 }
                             },

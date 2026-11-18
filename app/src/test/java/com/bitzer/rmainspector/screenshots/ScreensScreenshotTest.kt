@@ -145,6 +145,33 @@ abstract class ScreenCatalog(private val device: String) {
         }
     }
 
+    // --- Camera search overlay (D1): stateless ScannerContent; the live preview is a dark placeholder here.
+    @Composable
+    private fun scanner(state: com.bitzer.rmainspector.ui.scan.ScannerState) =
+        com.bitzer.rmainspector.ui.scan.ScannerContent(state, onModeChange = {}, onCapture = {}, onPickLine = {}, onRetry = {},
+            onGrantPermission = {}, onOpenAppSettings = {}, onClose = {},
+            preview = { Surface(Modifier.fillMaxSize(), color = com.bitzer.rmainspector.ui.theme.BitzerColors.Grey90) {} })
+
+    @Test fun scanner_barcode() = shot("scanner_barcode") {
+        scanner(com.bitzer.rmainspector.ui.scan.ScannerState.Scanning(com.bitzer.rmainspector.ui.scan.ScanMode.BARCODE))
+    }
+    @Test fun scanner_plate() = shot("scanner_plate") {
+        scanner(com.bitzer.rmainspector.ui.scan.ScannerState.Scanning(com.bitzer.rmainspector.ui.scan.ScanMode.PLATE))
+    }
+    @Test fun scanner_plate_reading() = shot("scanner_plate_reading") {
+        scanner(com.bitzer.rmainspector.ui.scan.ScannerState.Scanning(com.bitzer.rmainspector.ui.scan.ScanMode.PLATE, reading = true))
+    }
+    @Test fun scanner_found() = shot("scanner_found") { scanner(com.bitzer.rmainspector.ui.scan.ScannerState.Found("912345")) }
+    @Test fun scanner_pick_line() = shot("scanner_pick_line") {
+        scanner(com.bitzer.rmainspector.ui.scan.ScannerState.PickLine(listOf("Model 4FE-28Y", "25X0000001", "912345")))
+    }
+    @Test fun scanner_nothing_read() = shot("scanner_nothing_read") { scanner(com.bitzer.rmainspector.ui.scan.ScannerState.NothingRead) }
+    @Test fun scanner_permission() = shot("scanner_permission") { scanner(com.bitzer.rmainspector.ui.scan.ScannerState.NeedsPermission()) }
+    @Test fun scanner_permission_blocked() = shot("scanner_permission_blocked") {
+        scanner(com.bitzer.rmainspector.ui.scan.ScannerState.NeedsPermission(blocked = true))
+    }
+    @Test fun scanner_no_camera() = shot("scanner_no_camera") { scanner(com.bitzer.rmainspector.ui.scan.ScannerState.NoCamera) }
+
     @Test fun settings() = shot("settings") {
         SettingsScreen(ScreenshotData.appOk, onBack = {}, onSaveServer = { null }, onResetServer = {}, onTest = {}, onSignOut = {})
     }
