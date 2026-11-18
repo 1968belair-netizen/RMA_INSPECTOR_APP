@@ -3,6 +3,13 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Milestone A approved; work-list blank product type (Jacob)
+- **Milestone A approved** after Jacob's device test (phone): everything passed, no issues found. Report: issue #33.
+- **Question 5 answered:** add a **"(blank)" product-type chip, on by default**, so Received RMAs with no product
+  type never drop off the work list (fix PR; api.md defines how the work-list filter asks for blank).
+- **Idea logged, not scheduled:** pre-filled checklist on the Findings tab as an alternative to guided inspection —
+  spec §15.1, issue #34 (milestone D, label `idea`). Decide later.
+
 ## 2026-11-18 — Upload queue and sign-out (Jacob, for #9)
 1. **Wording:** sign-out clears the **session and screen history** but **never the upload queue**.
 2. **Held uploads:** queued uploads of a signed-out inspector are held on the tablet until **that same inspector**

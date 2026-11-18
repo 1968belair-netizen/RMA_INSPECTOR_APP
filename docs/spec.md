@@ -426,3 +426,15 @@ Rework / Inspected / Report Complete).
 2. **Signature scope:** confirm the workbench's change-check signature covers every field §6.5 needs (Phase 4).
 3. **Sent-photo retention** on the tablet: 30 days (decided) — review for storage later.
 4. **Guided checklists:** content per product type (Recip first?) — later; the format is ready (api §4).
+
+---
+
+## 15. Future ideas (not scheduled — decide later)
+
+### 15.1 Pre-filled checklist on the Findings tab (alternative to guided inspection) — issue #34
+When a server checklist exists for the product type, its **required parts are pre-loaded as rows** on the Findings
+tab, each defaulting to issue **50 Normal**. Each row has a **camera icon** that opens the camera and applies the
+same photo rules as guided mode: overall photo required; detail photo required when the issue isn't Normal;
+Required/Optional badges; skip only optional. Uses the same server checklists (`/codelists` `checklists`), so it can
+replace or sit beside guided mode (§5). Decide later.
+
