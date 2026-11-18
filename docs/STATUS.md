@@ -14,17 +14,16 @@ In parallel: `#45 M1` mock PDF, `#46 M2` demo dataset + checklist; then `#20 D2`
 ### Open PRs
 | PR | Issue | Branch | State |
 |---|---|---|---|
-| #40 | #10 C1 Report tab | `feature/c1-report-tab` | **taken over by the coordinator (14:15 ET)** — old session stopped. Rebased on main (`d305132`); CI re-running. Merge when green. |
-| #44 | #7 B2 Photos | `feature/b2-photos` | thread fixing build failure + conflict with main (after #43). |
+| #44 | #7 B2 Photos | `feature/b2-photos` | build ✅; first emulator run killed by a runner shutdown (infra). **Conflicts with merged C1** (ApiClient, ServiceLocator, WorkspaceScreen/State) — B2 thread merging main now (14:45 ET). |
 
-**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 docs · #49 M1 mock report PDF · #48 M2 demo dataset + checklist + run script · #47 demo-plan docs.
+**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 docs · #49 M1 mock report PDF · #48 M2 demo dataset + checklist + run script · #47 demo-plan docs · #50 docs · **#40 C1 Report tab (26fd4e1, 14:41 ET)**.
 **Emulator tests on main (A6 + B1 together): ✅ passed** (run on PR #47, 2026-11-18 14:12 ET).
 
 ### Open issues
 | Issue | Milestone | State | Depends on |
 |---|---|---|---|
 | #7 B2 Photos | B | PR #44 (conflicts with main; thread rebasing) | B1 ✅ |
-| #10 C1 Report tab | C | PR #40 (old session) | — |
+| #10 C1 Report tab | C | **done** (#40) | — |
 | #45 M1 Mock report PDF | E Demo | **done** (#49) | — |
 | #46 M2 Demo dataset + checklist + run script | E Demo | **done** (#48) | — |
 | #8 B3 Submit inspection | B | not started (banner only for offline; no queue edge cases) | B2 |
