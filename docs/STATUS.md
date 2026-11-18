@@ -1,46 +1,38 @@
-# Status — 2026-11-18 13:40 ET (coordinator session 2, updated after #39 merged)
+# Status — 2026-11-18 16:10 ET (coordinator session 2)
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
-## 1. Milestones and open work — DEMO PRIORITY (2026-11-18 13:58)
-**Goal:** full loop working against the mock server for a manager demo (see decisions.md "Demo plan"). No in-app demo
-mode. Offline-queue edge cases, conflict screens and lock handling beyond the banner wait until after the demo.
-**Milestones:** A done · B/C in progress · **E Demo** (new, #45, #46). Report "DEMO READY" + APK link + `docs/demo.md` when done.
-
-### Demo critical path
-`#7 B2` ✅ → `#8 B3 Submit inspection` ∥ `#11 C2 Submit report` (C1 ✅) → `docs/demo.md` → DEMO READY.
-In parallel: `#45 M1` mock PDF, `#46 M2` demo dataset + checklist; then `#20 D2` guided inspection if time allows.
+## 1. Milestones and open work — DEMO PRIORITY
+**Goal:** full loop against the mock server for a manager demo (see decisions.md "Demo plan"). No in-app demo mode.
+Offline-queue edge cases, conflict screens and lock handling beyond the banner wait until after the demo.
+**Milestones:** A done · B/C demo path done · **E Demo** in progress. Post "DEMO READY" + APK link + `docs/demo.md` when done.
 
 ### Open PRs
 | PR | Issue | Branch | State |
 |---|---|---|---|
-| (coming) | #8 B3 Submit inspection | `feature/b3-submit-inspection` | thread started 2026-11-18 ~15:05 ET |
-| (coming) | #11 C2 Submit report (spell check → build → PDF preview) | `feature/c2-submit-report` | thread started ~15:05 ET |
-| (coming) | #20 D2 Guided inspection | `feature/d2-guided-inspection` | thread started ~15:05 ET; nice-to-have |
+| #53 | #20 D2 Guided inspection | `feature/d2-guided-inspection` | green; conflicts with main after #54, D2 thread merging main. Jacob approved merging **without** the emulator test (follow-up #56); revert if it causes problems |
 
-**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 docs · #49 M1 mock report PDF · #48 M2 demo dataset + checklist + run script · #47 demo-plan docs · #50 docs · #40 C1 Report tab (26fd4e1, 14:41 ET) · **#44 B2 Photos (330c875, 15:00 ET)**.
-**Emulator tests on main (A6 + B1 together): ✅ passed** (run on PR #47, 2026-11-18 14:12 ET).
+**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 · #47 · #50 docs · #49 M1 mock PDF · #48 M2 demo dataset · #40 C1 Report tab · #44 B2 Photos · #55 C2 Submit report · #57 C2 emulator acceptance checks · **#54 B3 Submit inspection** (3100cd3).
+**Emulator tests on main:** A6 + B1 ✅ (2026-11-18 14:12 ET). #54 and #57 emulator ✅ (one `SmokeTest` flake, passed on re-run).
 
 ### Open issues
-| Issue | Milestone | State | Depends on |
-|---|---|---|---|
-| #7 B2 Photos | B | **done** (#44) | B1 ✅ |
-| #10 C1 Report tab | C | **done** (#40) | — |
-| #45 M1 Mock report PDF | E Demo | **done** (#49) | — |
-| #46 M2 Demo dataset + checklist + run script | E Demo | **done** (#48) | — |
-| #8 B3 Submit inspection | B | **in progress** (happy path; offline = message only) | B2 ✅ |
-| #11 C2 Submit report | C | **in progress** (parallel with B3) | C1 ✅ |
-| #20 D2 Guided inspection | D | **in progress** (nice-to-have) | B2 ✅, #46 checklist ✅ |
-| #9 B4 Queue, conflicts, lock/retry | B | **deferred until after the demo** | B3 |
-| #34 Idea: pre-filled checklist | D | **idea — do not implement** | — |
-| #21 S1 Real server, read-only | server | ready, local on Jacob's laptop. Acceptance now explicitly includes `(blank)` in `work_list_product_types` defaults + the `(blank)` token | — |
-| #22 S2 Real server, write side | server | later, local | matching tablet issues |
+| Issue | Milestone | State |
+|---|---|---|
+| #20 D2 Guided inspection | D | PR #53 open; stays open until the emulator test lands (#56) |
+| #56 D2b emulator test, guided inspection with demo dataset | E Demo | after the demo |
+| #9 B4 Queue, conflicts, lock/retry | B | **deferred until after the demo** (B3 shows dialogs only for 409/423/offline) |
+| #34 Idea: pre-filled checklist | D | idea — do not implement |
+| #21 S1 Real server, read-only | server | local on Jacob's laptop; acceptance includes `(blank)` in `work_list_product_types` defaults |
+| #22 S2 Real server, write side | server | later, local |
+
+Done: #7 B2, #8 B3, #10 C1, #11 C2, #45 M1, #46 M2.
 
 ## 2. Next steps
-1. When #44 is green and acceptance met → attempt the merge (Jacob approves); if blocked post "READY TO MERGE: #n".
-2. After B2 merges start #8 B3 (and #20 D2 once #46 merges). After B3 + C1 merge start #11 C2.
-3. When the loop works: write `docs/demo.md` (setup + 5-minute tap-by-tap script), then post DEMO READY.
-4. Worktrees used by threads: `/home/claude/wt-b2`, `/home/claude/wt-c1` (session-local).
+1. Merge #53 once its conflicts are resolved and the build is green.
+2. Write `docs/demo.md` (setup + 5-minute tap-by-tap script) and merge it.
+3. Wait for the main-push APK build (release `latest`), confirm it includes guided inspection, post DEMO READY.
+4. Known gaps: camera features (D1, B2) never run on a real tablet; B3 emulator test covers Received → Inspected only
+   (912358 rebuild / 912359 resend warning are screenshot-tested only).
 
 ## 3. Rapid-mode rules in force (CLAUDE.md → Workflow → Rapid development mode)
 1. Keep **3 issues in progress at all times**. Start independent work now (C against the mock); only truly
