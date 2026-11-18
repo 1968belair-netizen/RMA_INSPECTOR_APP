@@ -1,4 +1,4 @@
-# Status — 2026-11-18 13:20 ET (hand-over to a fresh session)
+# Status — 2026-11-18 13:40 ET (coordinator session 2, updated after #39 merged)
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
@@ -9,42 +9,37 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 **Current:** milestone **B Inspect**, running in parallel with **C Report** (rapid mode).
 
 ### Open PRs
-| PR | Issue | Branch | State at hand-over |
+| PR | Issue | Branch | State |
 |---|---|---|---|
-| #37 | #36 A6 "(blank)" product-type chip, on by default | `feature/a6-blank-product-type` | build ✅, emulator running. Merge when green. |
-| #39 | #5 B1 Findings tab + local drafts | `feature/b1-findings` | build + emulator running. Merge when green and all acceptance items are met. |
-| #40 | #10 C1 Report tab | `feature/c1-report-tab` | **build ❌** (first run). The C1 thread is fixing it. |
+| #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅, emulator running. Merge when green and acceptance met. |
+| #42 | — | `docs/approve-q3-q4-q6` | Docs: Q3/4/6 approved; rebased on main after #39. |
+| #44 | #7 B2 Photos | `feature/b2-photos` | in CI (build + emulator running). Merge when green and acceptance met. |
 
-All three were started by threads in the old session; they may finish and merge on their own before the new session
-starts. Check `gh api "repos/1968belair-netizen/rma_inspector_app/pulls?state=open"` first.
+**Merged this session:** #39 B1 Findings tab (merged by Jacob); #37 A6 "(blank)" chip (squash 8777e16); #43 D1 camera search (squash 91cbe41). Real-tablet test of the camera is still needed.
 
 ### Open issues
 | Issue | Milestone | State | Branch | Depends on |
 |---|---|---|---|---|
-| #36 A6 blank product-type chip | A | PR #37 | `feature/a6-blank-product-type` | — |
-| #5 B1 Findings tab | B | PR #39 | `feature/b1-findings` | — |
 | #10 C1 Report tab | C | PR #40 | `feature/c1-report-tab` | — |
-| #7 B2 Photos tab | B | not started | — | B1 (row-photo slot + DraftStore) |
-| #8 B3 Submit inspection | B | not started | — | B1, B2 |
-| #9 B4 Offline queue, conflicts, lock/retry | B | not started | — | B3. Acceptance now includes the 2026-11-18 queue/sign-out rules (held per inspector, sign-out prompt, earlier-session banner, per-inspector queue view, A/B emulator test, second fake mock user) |
+| #7 B2 Photos tab | B | **in progress** | `feature/b2-photos` | B1 ✅ |
+| #8 B3 Submit inspection | B | not started | — | B2 (B1 ✅) |
+| #9 B4 Offline queue, conflicts, lock/retry | B | not started | — | B3. Acceptance includes the 2026-11-18 queue/sign-out rules |
 | #11 C2 Submit report | C | not started | — | B3 (and C1) |
-| #19 D1 Camera search | D | not started | — | — (can start any time) |
-| #20 D2 Guided inspection | D | not started | — | B1, B2 |
+| #20 D2 Guided inspection | D | not started | — | B2 (B1 ✅) |
 | #34 Idea: pre-filled checklist on Findings | D | **idea — do not implement** | — | decide later |
-| #21 S1 Real server, read-only | server | **ready**. Jacob runs it locally on his work laptop | — | — |
+| #21 S1 Real server, read-only | server | **ready**, local on Jacob's laptop | — | — |
 | #22 S2 Real server, write side | server | later, local | — | matching tablet issues |
 
+(#5 B1, #36 A6 and #19 D1 are closed by their merges.)
+
 ## 2. Work in progress and exact next steps
-1. **#37 / #39 / #40:** if a PR is still open, read its issue's latest comment. Then: green CI + acceptance met →
-   rebase on main if needed → squash-merge (standing approval). C1 (#40) had a failing build on its first run; check
-   `gh run view --log-failed` for its latest run.
-2. **After B1 merges**, start **#7 B2 Photos**. It plugs into B1's row-photo slot and DraftStore; see B1's PR / final
-   comment.
-3. **Keep 3 issues in progress:** next candidates are #7 B2 (after B1), #19 D1 camera search (independent), then #8
-   B3 → #9 B4 and #11 C2.
+1. **#40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
+   still blocked, post "READY TO MERGE: #n" in chat and keep working.
+2. **#7 B2** (PR #44) is in a Sonnet thread (worktree `/home/claude/wt-b2`). #19 D1 is done.
+3. **Only 2 issues in progress (#10, #7):** every remaining issue depends on B2/B3/C1 (or is local server work), so nothing else can start yet. When B2 merges start #8 B3 and #20 D2 together. Candidates: next candidates are #8 B3 (after B2) → #9 B4, #11 C2 (after B3 + C1) and #20 D2.
 4. **After B and C are done**, post one short milestone report covering both (APK link, screenshots, tests, gaps,
    questions). Jacob tests B and C together on his phone.
-5. Worktrees used by threads: `/home/claude/wt-a6`, `/home/claude/wt-b1`, `/home/claude/wt-c1`. These are
+5. Worktrees used by threads: `/home/claude/wt-b2` (earlier ones are gone). These are
    session-local; a new session starts from a fresh clone.
 6. Thread rules file (session-local copy): the same content is in CLAUDE.md "Rapid development mode" and below.
 
@@ -75,11 +70,6 @@ Known CI/session quirks:
   - Each test starts signed out.
 
 ## 4. Open items in `docs/questions.md` (recommended option already built; Jacob may override)
-| # | Issue | Question | Built |
-|---|---|---|---|
-| 3 | #4 | Code-list refresh interval; recent codes kept | Refresh on start/sign-in + when > 4 h old; 8 recent per picker, 6 shown |
-| 4 | #17 | Work-list chips per tablet or per inspector | Per tablet, kept across sign-out |
-| 5 | #17 | Chip for blank product type | **Answered** by Jacob: add "(blank)", on by default. Row removed by PR #37 (#36) |
-| 6 | #18 | When the workspace shows two panes | Width ≥ 840 dp; narrower = list → detail |
-
-Rows added by #39 (B1) or #40 (C1) will appear when those PRs merge; check the file on main.
+Q3, Q4 and Q6 were **approved as built on 2026-11-18** and moved to `docs/decisions.md`. Q5 was answered ("(blank)"
+chip, on by default) and its row was removed by #37. Questions #7–10 came with B1 (#39); more may arrive with
+#40 (C1) — check the file on main.

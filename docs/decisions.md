@@ -3,6 +3,17 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Questions 3, 4 and 6 approved as built (Jacob)
+- **Code-list refresh (Q3, #4):** refresh on app start / sign-in (always, ETag → usually `304`) and when the device
+  copy is older than **4 h** (checked every 15 min); keep the last **8** used codes per picker, show up to **6**.
+  Reflected in: `CodeListRepository.DEFAULT_MAX_AGE_MS`, `RecentCodesStore`.
+- **Work-list chips (Q4, #17):** remembered **per tablet**, kept across sign-out and app restarts (not per
+  inspector). A "Reset work-list filters" action in Settings may come later. Reflected in:
+  `SettingsStore.workListFilter`.
+- **Two-pane workspace (Q6, #18):** by screen width — **≥ 840 dp** shows two panes (11" tablet landscape ≈ 1280 dp);
+  narrower (portrait tablet ≈ 800 dp, phones) shows list → detail. Reflected in: `TWO_PANE_MIN_WIDTH` in
+  `WorkspaceScreen.kt`.
+
 ## 2026-11-18 — Milestone A approved; work-list blank product type (Jacob)
 - **Milestone A approved** after Jacob's device test (phone): everything passed, no issues found. Report: issue #33.
 - **Question 5 answered:** add a **"(blank)" product-type chip, on by default**, so Received RMAs with no product
