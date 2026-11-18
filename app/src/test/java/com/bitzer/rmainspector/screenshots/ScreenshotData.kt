@@ -85,4 +85,26 @@ object ScreenshotData {
         lock = LockState(locked = true, heldBy = "JDOE2", host = "EXAMPLE-PC"))
     val rmaScroll = rma.copy(rmaId = "912348", displayNumber = "912348", productType = "Scroll", productTypeKey = "scroll",
         capabilities = Capabilities())
+
+    // --- Code pickers (A3). FAKE codes, shaped like the mock server's lists.
+    val issueCodes = listOf(
+        "01" to "Incomplete", "03" to "Missing", "04" to "Damaged", "10" to "Dirty", "12" to "Broken", "13" to "Heavy wear",
+        "22" to "Discolored", "32" to "Wear", "32a" to "Polished (Light wear)", "34" to "Scored / Scratched",
+        "38" to "Ground fault", "41" to "Overheated", "46" to "Burnt", "50" to "Normal", "51" to "Too low", "54" to "Galled",
+    ).map { (code, d) -> Code(null, code, d, pinFirst = code == "50") }
+    val normalIssues = listOf(CodeKey(null, "50"))
+
+    /** 180 fake part codes (natural-sort mix of plain, lettered and zero-padded codes). */
+    val manyParts: List<Code> = (1..180).map { i ->
+        val code = when {
+            i % 9 == 0 -> "${i}a"
+            i < 10 -> "0$i"
+            else -> "$i"
+        }
+        Code(null, code, "Fake part ${i}")
+    } + listOf(Code(null, "48a", "Winding resistance"), Code(null, "PV01", "Vessel"), Code(null, "TR06", "Length of wire w/ connector"))
+
+    val recentParts = listOf(CodeKey(null, "48a"), CodeKey(null, "07"), CodeKey(null, "PV01"))
+    val productTypeChips = listOf("Recip", "Scroll", "Screw", "Part", "Unknown").map { c(it) }
+    val returnCodeChips = listOf("Inspection Only", "Repair & Return", "Warranty", "Core&Inspection").map { c(it) }
 }

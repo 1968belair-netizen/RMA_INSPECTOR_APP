@@ -8,10 +8,12 @@ import com.bitzer.rmainspector.core.AppVersion
 import com.bitzer.rmainspector.core.ServerUrl
 import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.AppSettings
+import com.bitzer.rmainspector.data.CodeListRepository
 import com.bitzer.rmainspector.data.Health
 import com.bitzer.rmainspector.data.ServiceLocator
 import com.bitzer.rmainspector.data.Session
 import com.bitzer.rmainspector.data.User
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +53,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = ServiceLocator.settings(app)
     private val auth = ServiceLocator.auth(app)
     private val api = ServiceLocator.api
+    private val codeLists = ServiceLocator.codeLists(app)
     private val connection = MutableStateFlow<Connection>(Connection.Unknown)
     private val signIn = MutableStateFlow(SignInProgress())
 
@@ -68,6 +71,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refresh()
+        viewModelScope.launch {
+            codeLists.loadCached(store.settings.first().serverUrl) // usable offline after one download
+            // Every few hours while the app runs and someone is signed in (a 304 when nothing changed).
+            while (true) {
+                delay(CodeListRepository.CHECK_INTERVAL_MS)
+                if (auth.session.value != null) codeLists.refreshIfStale(store.settings.first().serverUrl)
+            }
+        }
+    }
+
+    /**
+     * Download code lists now (sign-in, app start / reconnect). Sends the ETag, so an unchanged list costs a
+     * `304`. Does nothing while signed out (the server would answer 401).
+     */
+    fun refreshCodeLists() {
+        if (auth.session.value == null) return
+        viewModelScope.launch { codeLists.refresh(store.settings.first().serverUrl, force = true) }
     }
 
     /** Re-check the server (reachability + version). Refreshes the signed-in user's name/initials if possible. */
@@ -86,6 +106,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
             val session = auth.session.value ?: return@launch
+            refreshCodeLists()
             // A 401 here signs the user out via ApiClient → AuthStore.expire.
             (api.me(settings.serverUrl) as? ApiResult.Ok)?.value?.let { user ->
                 if (user != session.user && auth.session.value?.token == session.token) auth.save(session.copy(user = user))
@@ -106,6 +127,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 is ApiResult.Ok -> {
                     auth.save(Session(r.value.token, r.value.user))
                     signIn.value = SignInProgress()
+                    refreshCodeLists()
                 }
                 is ApiResult.Failure -> signIn.value = SignInProgress(error = r.message)
             }

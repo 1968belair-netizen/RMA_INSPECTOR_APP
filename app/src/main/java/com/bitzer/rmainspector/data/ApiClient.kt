@@ -67,6 +67,36 @@ class ApiClient(
     suspend fun codeLists(baseUrl: String): ApiResult<CodeLists> =
         get(url(baseUrl, "codelists"), baseUrl, CodeLists.serializer())
 
+    /**
+     * `/codelists` with `If-None-Match` (api §4). Returns the raw body so the cache keeps exactly what the server
+     * sent; `304` → [CodeListFetch.NotModified].
+     */
+    suspend fun codeListsConditional(baseUrl: String, etag: String?): ApiResult<CodeListFetch> = withContext(Dispatchers.IO) {
+        val url = url(baseUrl, "codelists")
+            ?: return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
+        val token = tokenProvider()
+        val request = requestBuilder(url, token).apply {
+            if (!etag.isNullOrEmpty()) header("If-None-Match", etag)
+        }.build()
+        try {
+            http.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                when {
+                    resp.code == 304 -> ApiResult.Ok(CodeListFetch.NotModified)
+                    resp.isSuccessful -> try {
+                        val parsed = json.decodeFromString(CodeLists.serializer(), body)
+                        ApiResult.Ok(CodeListFetch.Fresh(body, resp.header("ETag") ?: parsed.etag.ifEmpty { null }, parsed))
+                    } catch (e: Exception) {
+                        ApiResult.Failure(ApiResult.Kind.BAD_RESPONSE, "The server sent code lists the app doesn't understand.", httpStatus = resp.code)
+                    }
+                    else -> errorResult(resp.code, body, token, reportUnauthorized = true)
+                }
+            }
+        } catch (e: IOException) {
+            unreachable(baseUrl)
+        }
+    }
+
     /** Free-text search; the server decides whether it's an RMA, a serial, … (api §5). */
     suspend fun search(baseUrl: String, query: String): ApiResult<SearchResponse> =
         get(url(baseUrl, "rmas", "search", query = mapOf("q" to query.trim())), baseUrl, SearchResponse.serializer())
@@ -106,13 +136,7 @@ class ApiClient(
             return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
         }
         val token = explicitToken ?: if (authorized) tokenProvider() else null
-        val request = Request.Builder().url(url).apply {
-            header("Accept", "application/json")
-            if (appVersion.isNotEmpty()) header("X-App-Version", appVersion)
-            deviceIdProvider()?.let { header("X-Device-Id", it) }
-            if (!token.isNullOrEmpty()) header("Authorization", "Bearer $token")
-            if (body != null) post(body)
-        }.build()
+        val request = requestBuilder(url, token).apply { if (body != null) post(body) }.build()
         try {
             http.newCall(request).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
@@ -124,25 +148,40 @@ class ApiClient(
                         ApiResult.Failure(ApiResult.Kind.BAD_RESPONSE, "The server sent an answer the app doesn't understand. Is this the RMA app server?", httpStatus = resp.code)
                     }
                 } else {
-                    val err = runCatching { json.decodeFromString(ApiErrorEnvelope.serializer(), text).error }.getOrNull()
-                    if (resp.code == 401 && !token.isNullOrEmpty() && explicitToken == null) onUnauthorized(token)
-                    ApiResult.Failure(
-                        ApiResult.Kind.SERVER_ERROR,
-                        err?.message ?: "The server answered with error ${resp.code}.",
-                        code = err?.code,
-                        httpStatus = resp.code,
-                        retryable = err?.retryable ?: (resp.code >= 500),
-                    )
+                    errorResult(resp.code, text, token, reportUnauthorized = explicitToken == null)
                 }
             }
         } catch (e: IOException) {
-            ApiResult.Failure(
-                ApiResult.Kind.UNREACHABLE,
-                "Can't reach the server at $baseUrl. Check the address in Settings and that this device is on the same network.",
-                retryable = true,
-            )
+            unreachable(baseUrl)
         }
     }
+
+    /** Headers every call carries (api §1): Accept, X-App-Version, X-Device-Id and the bearer token if any. */
+    private fun requestBuilder(url: HttpUrl, token: String?): Request.Builder = Request.Builder().url(url).apply {
+        header("Accept", "application/json")
+        if (appVersion.isNotEmpty()) header("X-App-Version", appVersion)
+        deviceIdProvider()?.let { header("X-Device-Id", it) }
+        if (!token.isNullOrEmpty()) header("Authorization", "Bearer $token")
+    }
+
+    /** Error envelope → friendly failure; a 401 for the stored token goes to [onUnauthorized]. */
+    private fun errorResult(status: Int, text: String, token: String?, reportUnauthorized: Boolean): ApiResult.Failure {
+        val err = runCatching { json.decodeFromString(ApiErrorEnvelope.serializer(), text).error }.getOrNull()
+        if (status == 401 && !token.isNullOrEmpty() && reportUnauthorized) onUnauthorized(token)
+        return ApiResult.Failure(
+            ApiResult.Kind.SERVER_ERROR,
+            err?.message ?: "The server answered with error $status.",
+            code = err?.code,
+            httpStatus = status,
+            retryable = err?.retryable ?: (status >= 500),
+        )
+    }
+
+    private fun unreachable(baseUrl: String) = ApiResult.Failure(
+        ApiResult.Kind.UNREACHABLE,
+        "Can't reach the server at $baseUrl. Check the address in Settings and that this device is on the same network.",
+        retryable = true,
+    )
 
     companion object {
         /** Shown on the sign-in screen for `401 INVALID_CREDENTIALS` (issue #16 acceptance: exactly this text). */
@@ -169,6 +208,13 @@ class ApiClient(
             }.build()
         }
     }
+}
+
+/** Outcome of a conditional `/codelists` call. */
+sealed interface CodeListFetch {
+    data object NotModified : CodeListFetch
+    /** [raw] is the body exactly as received; it is what gets cached. */
+    data class Fresh(val raw: String, val etag: String?, val lists: CodeLists) : CodeListFetch
 }
 
 /** `inspection_status` query value: comma-separated codes; `group:code` when a group is present (api §5). */
