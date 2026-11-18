@@ -22,6 +22,8 @@ import com.bitzer.rmainspector.ui.settings.SettingsScreen
 import com.bitzer.rmainspector.ui.signin.SignInContent
 import com.bitzer.rmainspector.ui.signin.SignInState
 import com.bitzer.rmainspector.ui.theme.RmaInspectorTheme
+import com.bitzer.rmainspector.ui.workspace.ConflictCard
+import com.bitzer.rmainspector.ui.workspace.ReportCallbacks
 import com.bitzer.rmainspector.ui.workspace.WorkspaceCallbacks
 import com.bitzer.rmainspector.ui.workspace.WorkspaceContent
 import com.bitzer.rmainspector.ui.workspace.WorkspaceLoad
@@ -82,7 +84,17 @@ abstract class ScreenCatalog(private val device: String) {
         workspace(ScreenshotData.workspace.copy(failureExpanded = true))
     }
     @Test fun workspace_photos() = shot("workspace_photos") { workspace(ScreenshotData.workspace.copy(tab = WorkspaceTab.PHOTOS)) }
-    @Test fun workspace_report() = shot("workspace_report") { workspace(ScreenshotData.workspace.copy(tab = WorkspaceTab.REPORT)) }
+    @Test fun workspace_report() = shot("workspace_report") { workspace(ScreenshotData.workspaceReport) }
+    @Test fun workspace_report_part_selected() = shot("workspace_report_part_selected") { workspace(ScreenshotData.workspaceReportPart) }
+    @Test fun workspace_report_keyboard_open() = shot("workspace_report_keyboard_open") { workspace(ScreenshotData.workspaceReportKeyboard) }
+    @Test fun workspace_report_arrange() = shot("workspace_report_arrange") { workspace(ScreenshotData.workspaceReportArrange) }
+    @Test fun workspace_report_conflict() = shot("workspace_report_conflict") {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(24.dp)) {
+                ConflictCard(ScreenshotData.reportConflict, pickedCount = 3, ReportCallbacks())
+            }
+        }
+    }
     @Test fun workspace_locked() = shot("workspace_locked") { workspace(ScreenshotData.workspaceLocked) }
     @Test fun workspace_scroll_read_only() = shot("workspace_scroll_read_only") { workspace(ScreenshotData.workspaceScroll) }
     @Test fun workspace_closed() = shot("workspace_closed") { workspace(ScreenshotData.workspaceClosed) }

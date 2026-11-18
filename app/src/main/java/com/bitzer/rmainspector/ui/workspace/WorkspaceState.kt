@@ -58,6 +58,8 @@ data class WorkspaceState(
     val guided: GuidedButton = GuidedButton.Unavailable(""),
     val changedElsewhere: Boolean = false,
     val findings: FindingsState = FindingsState(),
+    /** Report tab data (C1); filled by [ReportViewModel], passed in by [WorkspaceScreen]. */
+    val report: ReportState = ReportState(),
 ) {
     val rma: RmaDetail? get() = (load as? WorkspaceLoad.Loaded)?.rma
     val banners: List<WorkspaceBanner> get() = rma?.let { workspaceBanners(it, changedElsewhere) }.orEmpty()

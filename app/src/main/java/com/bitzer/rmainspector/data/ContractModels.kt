@@ -114,6 +114,8 @@ data class CodeLists(
     val limits: Map<String, Int> = emptyMap(),
     /** Guided inspection lists keyed by `product_type_key` (api §4). Empty in v1. */
     val checklists: Map<String, Checklist> = emptyMap(),
+    /** Report settings (api §4): pages per photo page, fixed pages. */
+    val report: ReportSettings = ReportSettings(),
 ) {
     /** The cause picker is shown only when the server sends causes (none for Macola). */
     val causesEnabled: Boolean get() = causes.isNotEmpty()
