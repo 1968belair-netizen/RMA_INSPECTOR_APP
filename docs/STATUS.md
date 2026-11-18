@@ -35,7 +35,7 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 (#5 B1 and #36 A6 are closed by their merges.)
 
 ## 2. Work in progress and exact next steps
-1. **#37 / #40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
+1. **#40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
    still blocked, post "READY TO MERGE: #n" in chat and keep working.
 2. **#7 B2 and #19 D1** are running in Sonnet threads (worktrees `/home/claude/wt-b2`, `/home/claude/wt-d1`).
 3. **Keep 3 issues in progress:** next candidates are #8 B3 (after B2) → #9 B4, #11 C2 (after B3 + C1) and #20 D2.
@@ -73,5 +73,5 @@ Known CI/session quirks:
 
 ## 4. Open items in `docs/questions.md` (recommended option already built; Jacob may override)
 Q3, Q4 and Q6 were **approved as built on 2026-11-18** and moved to `docs/decisions.md`. Q5 was answered ("(blank)"
-chip, on by default) and its row was removed by #37. Questions #7–10 are added by PR #39 (B1) when it merges, and
+chip, on by default) and its row was removed by #37. Questions #7–10 came with B1 (#39); more may arrive with
 more by #40 (C1) — check the file on main.
