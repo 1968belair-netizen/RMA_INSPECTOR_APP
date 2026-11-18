@@ -93,15 +93,18 @@ class SmokeTest {
         openFromHomeList("912348")
         compose.waitUntilAtLeastOneExists(hasText("Handled in the repair database", substring = true), timeoutMillis = 15_000)
         back()
-        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 10_000)
+        // Home keeps its scroll position, so the card is on screen again (the headline may be scrolled away).
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.workItem("912348")), timeoutMillis = 10_000)
 
         // 912346 is open elsewhere → lock banner.
         openFromHomeList("912346")
         compose.waitUntilAtLeastOneExists(hasText("Open elsewhere by JDOE2", substring = true), timeoutMillis = 15_000)
         back()
-        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 10_000)
+        // Home keeps its scroll position, so the card is on screen again (the headline may be scrolled away).
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.workItem("912346")), timeoutMillis = 10_000)
 
         // Settings → Sign out returns to sign-in.
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
         compose.onNode(hasContentDescription("Settings") and hasClickAction()).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Sign out", substring = true), timeoutMillis = 10_000)
         compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
