@@ -60,6 +60,10 @@ The real app server (`server/`) is added later in a local session (Phase 4).
 - Jacob tests on a tablet at the **end of each milestone**; post a milestone report (done, screenshots, APK link,
   test results, known gaps, questions).
 - Commit messages: short imperative summary line.
+- **Commit and push at least after every meaningful step**, so a usage-limit pause never strands work locally.
+- **Before stopping, or when told a limit is near**, write a short "where I left off" comment on the issue: what's
+  done, the next step, and the branch name.
+- **When resuming**, read the issue's latest comment first.
 
 ## Screenshot tests (every PR)
 - Roborazzi on Robolectric, JVM only: `app/src/test/java/com/bitzer/rmainspector/screenshots/`.

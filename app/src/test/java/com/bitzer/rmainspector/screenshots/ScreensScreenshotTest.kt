@@ -30,6 +30,7 @@ abstract class ScreenCatalog(private val device: String) {
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/${device}_$name.png")
     }
 
+    @Composable
     private fun home(state: HomeState, app: com.bitzer.rmainspector.ui.AppUiState = ScreenshotData.appOk) =
         HomeContent(app, state, query = if (state.search is com.bitzer.rmainspector.ui.home.SearchState.Results) "25X" else "",
             onQueryChange = {}, onSearch = {}, onClearSearch = {}, onToggleStatus = {}, onRefreshWorkList = {},
