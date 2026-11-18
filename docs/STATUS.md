@@ -1,4 +1,4 @@
-# Status — 2026-11-18 13:20 ET (hand-over to a fresh session)
+# Status — 2026-11-18 13:40 ET (coordinator session 2)
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
@@ -9,14 +9,12 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 **Current:** milestone **B Inspect**, running in parallel with **C Report** (rapid mode).
 
 ### Open PRs
-| PR | Issue | Branch | State at hand-over |
+| PR | Issue | Branch | State |
 |---|---|---|---|
-| #37 | #36 A6 "(blank)" product-type chip, on by default | `feature/a6-blank-product-type` | build ✅, emulator running. Merge when green. |
-| #39 | #5 B1 Findings tab + local drafts | `feature/b1-findings` | build + emulator running. Merge when green and all acceptance items are met. |
-| #40 | #10 C1 Report tab | `feature/c1-report-tab` | **build ❌** (first run). The C1 thread is fixing it. |
-
-All three were started by threads in the old session; they may finish and merge on their own before the new session
-starts. Check `gh api "repos/1968belair-netizen/rma_inspector_app/pulls?state=open"` first.
+| #37 | #36 A6 "(blank)" product-type chip | `feature/a6-blank-product-type` | build ✅ test ✅, emulator running. Merge when green. |
+| #39 | #5 B1 Findings tab + local drafts | `feature/b1-findings` | **build ✅ emulator ✅, acceptance met, mergeable.** Squash-merge was **blocked by the session's permission check** — needs Jacob's OK or a merge from his side. B2 (#7) waits on this. |
+| #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅ (fixed), emulator running. Merge when green and acceptance met. |
+| (docs) | — | `docs/approve-q3-q4-q6` | Q3, Q4, Q6 moved to decisions.md; STATUS refreshed. |
 
 ### Open issues
 | Issue | Milestone | State | Branch | Depends on |
@@ -75,11 +73,6 @@ Known CI/session quirks:
   - Each test starts signed out.
 
 ## 4. Open items in `docs/questions.md` (recommended option already built; Jacob may override)
-| # | Issue | Question | Built |
-|---|---|---|---|
-| 3 | #4 | Code-list refresh interval; recent codes kept | Refresh on start/sign-in + when > 4 h old; 8 recent per picker, 6 shown |
-| 4 | #17 | Work-list chips per tablet or per inspector | Per tablet, kept across sign-out |
-| 5 | #17 | Chip for blank product type | **Answered** by Jacob: add "(blank)", on by default. Row removed by PR #37 (#36) |
-| 6 | #18 | When the workspace shows two panes | Width ≥ 840 dp; narrower = list → detail |
-
-Rows added by #39 (B1) or #40 (C1) will appear when those PRs merge; check the file on main.
+Q3, Q4 and Q6 were **approved as built on 2026-11-18** and moved to `docs/decisions.md`. Q5 was answered ("(blank)"
+chip, on by default); its row goes when PR #37 merges. Questions #7–10 are added by PR #39 (B1) when it merges, and
+more by #40 (C1) — check the file on main.
