@@ -242,7 +242,7 @@ class SmokeTest {
     /** A Findings list row containing [text]. */
     private fun findingRow(text: String) =
         SemanticsMatcher("finding row") { n ->
-            n.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("finding_row_") == true
+            n.config.getOrElseNullable(SemanticsProperties.TestTag) { null }?.startsWith("finding_row_") == true
         } and hasText(text, substring = true)
 
     /** Opens the dropdown labelled [label] in the part sheet and picks the code with [description]. */
