@@ -59,7 +59,7 @@ S/4HANA OData entity/property names the server would actually call must be confi
 | `header.failure_code` (RMA team) | `OERMAHDR_iPro.Failure_Cd` (drop-down from `oermactl_ipro`) | Notification header coding (catalog "coding", QMEL-QMGRP/QMCOD) | **Unknown** |
 | `header.failure_description` (RMA team) | `OERMAHDR_iPro.Failure_Mode` (from customer's RMA request) | Notification short text (QMTXT) or header long text | **Unknown** |
 | `header.comments` (RMA team) | `OERMAHDR_iPro.Comments` (500) | Notification header long text (separate text ID) | **Unknown** |
-| `product_type` / `product_type_key` | `OERMAHDR_iPro.Product_Type`, else model prefix | Material group / product hierarchy of the material, or custom field | **Unknown** |
+| `product_type` / `product_type_key` (work-list filter; token `(blank)` = empty) | `OERMAHDR_iPro.Product_Type`, else model prefix | Material group / product hierarchy of the material, or custom field — `work_list_product_types` (incl. `(blank)`) re-pointed at cutover | **Unknown** |
 | `capabilities` | Server config per product type | Server config (unchanged) | Known |
 
 ## 4. Findings (parts rows, summary)

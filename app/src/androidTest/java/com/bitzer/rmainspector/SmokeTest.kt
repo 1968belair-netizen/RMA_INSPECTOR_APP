@@ -155,19 +155,22 @@ class SmokeTest {
     }
 
     /**
-     * Issue #17: the default work list (Received; Recip/Scroll/Screw/Part; Inspection Only/Repair & Return/Warranty)
-     * is oldest first; unticking a chip refilters and is remembered when Home is opened again after sign-out/in.
+     * Issue #17: the default work list (Received; Recip/Scroll/Screw/Part/(blank); Inspection Only/Repair & Return/
+     * Warranty) is oldest first; unticking a chip refilters and is remembered when Home is opened again after
+     * sign-out/in. Issue #36: the "(blank)" chip is on by default (912360 has no product type); unticking hides it.
      */
     @Test
     fun workListDefaultOrderAndRememberedChips() {
         compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
         signInAsDemo()
-        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("6 RMAs"), timeoutMillis = 30_000)
-        assertWorkListOrder(listOf("912346", "912348", "912345", "912352", "912355", "912357"))
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("7 RMAs"), timeoutMillis = 30_000)
+        assertWorkListOrder(listOf("912346", "912348", "912345", "912352", "912355", "912357", "912360"))
 
-        // Untick Scroll → 912348 drops out.
+        // Untick Scroll → 912348 drops out; untick (blank) → 912360 drops out.
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
         compose.onNode(hasText("Scroll") and hasClickAction()).performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("6 RMAs"), timeoutMillis = 15_000)
+        compose.onNode(hasText("(blank)") and hasClickAction()).performScrollTo().performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag(HomeTags.COUNT) and hasText("5 RMAs"), timeoutMillis = 15_000)
 
         // Sign out and in again: a new Home reads the remembered chips from the device.

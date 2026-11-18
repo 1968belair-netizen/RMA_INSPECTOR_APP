@@ -82,7 +82,9 @@ RETURN_CODES = [
 
 # Work-list settings (server config; decision 2026-11-18). Matched trimmed + uppercase.
 WORK_LIST_STATUSES = ["Received"]
-WORK_LIST_PRODUCT_TYPES = ["Recip", "Scroll", "Screw", "Part"]
+# "(blank)" = reserved filter token for an empty product type (api §5, issue #36).
+BLANK_PRODUCT_TYPE = "(blank)"
+WORK_LIST_PRODUCT_TYPES = ["Recip", "Scroll", "Screw", "Part", BLANK_PRODUCT_TYPE]
 WORK_LIST_RETURN_CODES = ["Inspection Only", "Repair & Return", "Warranty"]
 REPORT_SENT_STATUSES = ["Sent to RSM", "Issued to Customer"]
 
@@ -203,5 +205,8 @@ def initial_rmas() -> dict:
              parts=[row("81", "34")],
              summary={"exists": True, "defect_code": code("14"), "blocks": {"1": "Example summary text."},
                       "inspected_by": "JD", "summary_by": "JD"}),
+        # Received, blank product type, default return code -> on the default work list via "(blank)" (issue #36).
+        _rma("912360", model="4CES-9Y", serial="25X0000015", product_type="", status="Received",
+             status_since="2026-11-16"),
     ]
     return copy.deepcopy({r["rma_id"]: r for r in rmas})
