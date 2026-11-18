@@ -23,7 +23,7 @@ if git ls-remote --exit-code --heads origin screenshots >/dev/null 2>&1; then
   (cd "$WORK" && git checkout -B screenshots)
 else
   git worktree add --detach "$WORK"
-  (cd "$WORK" && git checkout --orphan screenshots && git rm -rq . && printf '# Screenshots\nPublished by CI. Do not edit.\n' > README.md)
+  (cd "$WORK" && git checkout --orphan screenshots && git rm -rqf --cached . >/dev/null && git clean -fdxq && printf '# Screenshots\nPublished by CI. Do not edit.\n' > README.md)
 fi
 
 # Which screens changed versus main (new or different bytes)?
