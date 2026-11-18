@@ -8,11 +8,9 @@ Offline-queue edge cases, conflict screens and lock handling beyond the banner w
 **Milestones:** A done · B/C demo path done · **E Demo** in progress. Post "DEMO READY" + APK link + `docs/demo.md` when done.
 
 ### Open PRs
-| PR | Issue | Branch | State |
-|---|---|---|---|
-| #53 | #20 D2 Guided inspection | `feature/d2-guided-inspection` | green; conflicts with main after #54, D2 thread merging main. Jacob approved merging **without** the emulator test (follow-up #56); revert if it causes problems |
+None. **DEMO READY** posted 2026-11-18 ~16:35 ET: APK `RMA-Inspector-0.1.101-debug.apk` (release `latest`, built from 8072f8c, includes guided inspection); guide: `docs/demo.md`.
 
-**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 · #47 · #50 docs · #49 M1 mock PDF · #48 M2 demo dataset · #40 C1 Report tab · #44 B2 Photos · #55 C2 Submit report · #57 C2 emulator acceptance checks · **#54 B3 Submit inspection** (3100cd3).
+**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 · #47 · #50 docs · #49 M1 mock PDF · #48 M2 demo dataset · #40 C1 Report tab · #44 B2 Photos · #55 C2 Submit report · #57 C2 emulator acceptance checks · #54 B3 Submit inspection · **#53 D2 Guided inspection (8072f8c, merged without emulator test; revert if it causes problems)** · #58, #59 docs.
 **Emulator tests on main:** A6 + B1 ✅ (2026-11-18 14:12 ET). #54 and #57 emulator ✅ (one `SmokeTest` flake, passed on re-run).
 
 ### Open issues
@@ -28,10 +26,9 @@ Offline-queue edge cases, conflict screens and lock handling beyond the banner w
 Done: #7 B2, #8 B3, #10 C1, #11 C2, #45 M1, #46 M2.
 
 ## 2. Next steps
-1. Merge #53 once its conflicts are resolved and the build is green.
-2. Write `docs/demo.md` (setup + 5-minute tap-by-tap script) and merge it.
-3. Wait for the main-push APK build (release `latest`), confirm it includes guided inspection, post DEMO READY.
-4. Known gaps: camera features (D1, B2) never run on a real tablet; B3 emulator test covers Received → Inspected only
+1. Demo on the tablet; note anything that breaks.
+2. After the demo: #56 (guided emulator test), #9 B4 queue/conflicts, server issues #21/#22.
+3. Known gaps: camera features (D1, B2) never run on a real tablet; B3 emulator test covers Received → Inspected only
    (912358 rebuild / 912359 resend warning are screenshot-tested only).
 
 ## 3. Rapid-mode rules in force (CLAUDE.md → Workflow → Rapid development mode)
