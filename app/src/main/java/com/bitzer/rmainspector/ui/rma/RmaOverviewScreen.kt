@@ -49,6 +49,12 @@ import com.bitzer.rmainspector.ui.theme.BitzerColors
 @Composable
 fun RmaOverviewScreen(onBack: () -> Unit, vm: RmaOverviewViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    RmaOverviewContent(state = state, onBack = onBack, onRefresh = vm::load)
+}
+
+/** Stateless overview content — used by [RmaOverviewScreen] and by screenshot tests. */
+@Composable
+fun RmaOverviewContent(state: OverviewState, onBack: () -> Unit, onRefresh: () -> Unit) {
     val title = (state as? OverviewState.Loaded)?.rma?.displayNumber?.let { "RMA $it" } ?: "RMA"
 
     Scaffold(
@@ -59,7 +65,7 @@ fun RmaOverviewScreen(onBack: () -> Unit, vm: RmaOverviewViewModel = viewModel()
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
-                    IconButton(onClick = vm::load) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
+                    IconButton(onClick = onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
                 },
             )
         },
@@ -72,7 +78,7 @@ fun RmaOverviewScreen(onBack: () -> Unit, vm: RmaOverviewViewModel = viewModel()
                 }
                 is OverviewState.Error -> Column(Modifier.padding(24.dp)) {
                     InfoBanner(Icons.Filled.ErrorOutline, s.message, BitzerColors.Error) {
-                        if (!s.notFound) TextButton(onClick = vm::load) { Text("Retry") }
+                        if (!s.notFound) TextButton(onClick = onRefresh) { Text("Retry") }
                     }
                 }
                 is OverviewState.Loaded -> {

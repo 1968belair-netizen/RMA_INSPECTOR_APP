@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.roborazzi)
 }
 
 // CI passes -PversionCode=<run number>; local builds default to 1.
@@ -40,6 +41,13 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests {
+            // Robolectric + Roborazzi screenshot tests need the app's resources (fonts, logo).
+            isIncludeAndroidResources = true
+            all { it.maxHeapSize = "3g" }
+        }
+    }
 }
 
 dependencies {
@@ -65,4 +73,18 @@ dependencies {
     testImplementation(libs.org.json)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Screenshot tests (Roborazzi on Robolectric) — see CLAUDE.md "Screenshot tests".
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
+    // Emulator UI tests (connectedDebugAndroidTest in Actions).
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.espresso.core)
 }

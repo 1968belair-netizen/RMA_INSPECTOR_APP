@@ -49,9 +49,27 @@ The real app server (`server/`) is added later in a local session (Phase 4).
   ```
 - The Android emulator reaches a mock server on the host at `http://10.0.2.2:8000/api/v1`.
 
-## Workflow
-One GitHub Issue per feature → branch → PR → Actions green → tablet test (APK from the Release) → merge.
-Commit messages: short imperative summary line.
+## Workflow (decided 2026-11-18)
+- GitHub milestones **A Navigate · B Inspect · C Report · D Extras**; label `server` = real-server work done
+  **locally** on Jacob's laptop (never in a cloud session).
+- One issue → one branch (from the latest `main`) → PR using the template (3-line **Summary**) → Actions green.
+- **Standing approval:** merge (squash) when Actions is green **and** every acceptance item in the issue is met.
+- Up to **3 issues in parallel**. Branch from `main` only after the PRs you depend on are merged.
+- A decision the docs don't cover → add it to `docs/questions.md` (with a recommended option), keep working on
+  other issues. Record answered decisions in `docs/decisions.md`.
+- Jacob tests on a tablet at the **end of each milestone**; post a milestone report (done, screenshots, APK link,
+  test results, known gaps, questions).
+- Commit messages: short imperative summary line.
+
+## Screenshot tests (every PR)
+- Roborazzi on Robolectric, JVM only: `app/src/test/java/com/bitzer/rmainspector/screenshots/`.
+- Add a screen state: put a `@Test fun name() = shot("name") { ... }` in `ScreenCatalog` using a **stateless**
+  composable (`XxxContent(state, callbacks)`) and fake data from `ScreenshotData` — tablet (1280×800 landscape) and
+  phone (411×891 portrait) variants are produced automatically.
+- CI runs `./gradlew assembleDebug recordRoborazziDebug`, publishes PNGs to the `screenshots` branch and comments on
+  the PR with the screens that changed versus `main` plus the PR's Summary lines.
+- Emulator tests: `app/src/androidTest/` (Compose UI tests), run in Actions on an API 34 tablet emulator against the
+  mock server at `10.0.2.2:8000` (`connectedDebugAndroidTest`). PRs only — keep them few and focused (Actions minutes).
 
 ## Style
 - UI follows the BITZER Style Guide: BITZER Green `#3AAA35` primary, Dark green `#005B23`, greys; headlines in

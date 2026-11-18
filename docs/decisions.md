@@ -3,6 +3,21 @@
 Newest first. Each entry: date, decision, where it is reflected. Planning happens in the claude.ai project
 "RMA Inspection app"; this file is the repo's copy of what was decided.
 
+## 2026-11-18 — Build order, milestones and process (Jacob)
+- Core loop first: sign-in → code lists/pickers → home/work list → workspace shell → findings → photos → submit
+  inspection → queue/conflicts → report tab → submit report → camera search → guided inspection.
+- GitHub milestones: **A Navigate** (#15 tests setup, #16 sign-in, #4 pickers, #17 home, #18 shell), **B Inspect**
+  (#5, #7, #8, #9), **C Report** (#10, #11), **D Extras** (#19 camera, #20 guided). #6 closed (folded into #10).
+- **Server track** (label `server`, local session on Jacob's work laptop, parallel): #21 S1 read-only real server
+  (sign-in with server-side users — refuses to start without them — search, work list incl. `rma_queries.py`
+  extraction and `status_since` rules, detail, code lists) starts when the workspace shell is merged; #22 S2 write
+  side after the matching tablet issues (submit, photo filing, report build/spell check, 20-photo cap lift).
+- The token-less mock bypass in `run_mock_server.bat` is removed in the sign-in issue.
+- Process: up to 3 issues in parallel; **standing approval to merge** when Actions is green and acceptance criteria
+  are met; uncovered decisions go to `docs/questions.md` while work continues; screenshot tests (Roborazzi) +
+  emulator tests in Actions first, every PR comment shows changed screens + a 3-line summary; Jacob tests on a
+  tablet at the end of each milestone, with a milestone report; `docs/decisions.md` and the dev plan kept current.
+
 ## 2026-11-18 — Layout and behaviour decisions (Jacob) — spec rev 7, api rev 7
 Layout/behaviour only; built in later issues. **Supersedes:** "no sign-in in v1", "no barcode in v1", the inspector
 picker, the separate Summary screen/tab, the status-chip work list and its old defaults (Received / Rework /

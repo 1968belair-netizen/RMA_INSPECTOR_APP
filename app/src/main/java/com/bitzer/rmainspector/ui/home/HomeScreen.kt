@@ -69,13 +69,45 @@ fun HomeScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
-    val keyboard = LocalSoftwareKeyboardController.current
-    val runSearch = { keyboard?.hide(); vm.search(query) }
 
     // A single search hit opens the RMA straight away (spec §3.3).
     LaunchedEffect(state.openRmaId) {
         state.openRmaId?.let { onOpenRma(it); vm.onRmaOpened() }
     }
+
+    HomeContent(
+        app = app,
+        state = state,
+        query = query,
+        onQueryChange = { query = it },
+        onSearch = { vm.search(query) },
+        onClearSearch = { query = ""; vm.clearSearch() },
+        onToggleStatus = vm::toggleStatus,
+        onRefreshWorkList = vm::refreshWorkList,
+        onOpenSettings = onOpenSettings,
+        onRetryServer = onRetryServer,
+        onOpenRma = onOpenRma,
+    )
+}
+
+/** Stateless Home content — used by [HomeScreen] and by screenshot tests. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun HomeContent(
+    app: AppUiState,
+    state: HomeState,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onClearSearch: () -> Unit,
+    onToggleStatus: (com.bitzer.rmainspector.data.CodeKey) -> Unit,
+    onRefreshWorkList: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onRetryServer: () -> Unit,
+    onOpenRma: (rmaId: String) -> Unit,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val runSearch = { keyboard?.hide(); onSearch() }
 
     Scaffold(
         topBar = {
@@ -89,7 +121,7 @@ fun HomeScreen(
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.workList.loading,
-            onRefresh = { onRetryServer(); vm.refreshWorkList() },
+            onRefresh = { onRetryServer(); onRefreshWorkList() },
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
             LazyColumn(Modifier.fillMaxSize()) {
@@ -128,14 +160,14 @@ fun HomeScreen(
                     ) {
                         OutlinedTextField(
                             value = query,
-                            onValueChange = { query = it },
+                            onValueChange = onQueryChange,
                             label = { Text("RMA no. or serial") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
                             keyboardActions = KeyboardActions(onSearch = { runSearch() }),
                             trailingIcon = {
                                 if (query.isNotEmpty()) {
-                                    IconButton(onClick = { query = ""; vm.clearSearch() }) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
+                                    IconButton(onClick = onClearSearch) { Icon(Icons.Filled.Close, contentDescription = "Clear") }
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -189,7 +221,7 @@ fun HomeScreen(
                             val selected = status.key in state.workList.selected
                             FilterChip(
                                 selected = selected,
-                                onClick = { vm.toggleStatus(status.key) },
+                                onClick = { onToggleStatus(status.key) },
                                 label = { Text(status.description.ifBlank { status.code }) },
                                 leadingIcon = if (selected) {
                                     { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
@@ -204,7 +236,7 @@ fun HomeScreen(
                 when {
                     ws.error != null -> item {
                         InfoBanner(Icons.Filled.ErrorOutline, ws.error, BitzerColors.Error, Modifier.padding(24.dp)) {
-                            TextButton(onClick = { vm.refreshWorkList() }) { Text("Retry") }
+                            TextButton(onClick = { onRefreshWorkList() }) { Text("Retry") }
                         }
                     }
                     ws.loadedOnce && ws.selected.isEmpty() -> item {
@@ -221,7 +253,7 @@ fun HomeScreen(
                                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text("${ws.items.size} RMA${if (ws.items.size == 1) "" else "s"}",
                                         style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { vm.refreshWorkList() }) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
+                                    IconButton(onClick = { onRefreshWorkList() }) { Icon(Icons.Filled.Refresh, contentDescription = "Refresh") }
                                 }
                             }
                         }
