@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -23,6 +24,8 @@ sealed interface ApiResult<out T> {
         val code: String? = null,
         val httpStatus: Int? = null,
         val retryable: Boolean = false,
+        /** The error envelope's `details` (e.g. `current` + `current_signature` of `REPORT_PICS_CHANGED`). */
+        val details: JsonObject? = null,
     ) : ApiResult<Nothing>
 
     enum class Kind { UNREACHABLE, SERVER_ERROR, BAD_RESPONSE }
@@ -122,6 +125,32 @@ class ApiClient(
     suspend fun rmaDetail(baseUrl: String, rmaId: String): ApiResult<RmaDetail> =
         get(url(baseUrl, "rmas", rmaId), baseUrl, RmaDetail.serializer())
 
+    /** `GET /rmas/{id}/photos` (api §8): All Pics with part links, plus the `Report Pics ` folder. */
+    suspend fun photoListing(baseUrl: String, rmaId: String): ApiResult<PhotoListing> =
+        get(url(baseUrl, "rmas", rmaId, "photos"), baseUrl, PhotoListing.serializer())
+
+    /** `PUT /rmas/{id}/report-pics` (api §9.2). `409 REPORT_PICS_CHANGED` comes back as a failure with details. */
+    suspend fun putReportPics(baseUrl: String, rmaId: String, request: ReportPicsRequest): ApiResult<ReportPicsSaved> {
+        val body = writeJson.encodeToString(ReportPicsRequest.serializer(), request).toRequestBody(JSON_TYPE)
+        return send(url(baseUrl, "rmas", rmaId, "report-pics"), baseUrl, ReportPicsSaved.serializer(), body, httpMethod = "PUT")
+    }
+
+    /** `GET /rmas/{id}/photos/{all|report}/{filename}?size=thumb|full` (api §8) — the JPEG bytes. */
+    suspend fun photoBytes(baseUrl: String, rmaId: String, folder: String, filename: String, thumb: Boolean): ApiResult<ByteArray> =
+        withContext(Dispatchers.IO) {
+            val url = url(baseUrl, "rmas", rmaId, "photos", folder, filename, query = mapOf("size" to if (thumb) "thumb" else "full"))
+                ?: return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
+            val token = tokenProvider()
+            try {
+                http.newCall(requestBuilder(url, token).header("Accept", "image/jpeg").build()).execute().use { resp ->
+                    if (resp.isSuccessful) ApiResult.Ok(resp.body?.bytes() ?: ByteArray(0))
+                    else errorResult(resp.code, resp.body?.string().orEmpty(), token, reportUnauthorized = true)
+                }
+            } catch (e: IOException) {
+                unreachable(baseUrl)
+            }
+        }
+
     suspend fun <T> get(
         url: HttpUrl?,
         baseUrl: String,
@@ -140,12 +169,13 @@ class ApiClient(
         body: RequestBody?,
         authorized: Boolean = true,
         explicitToken: String? = null,
+        httpMethod: String = "POST",
     ): ApiResult<T> = withContext(Dispatchers.IO) {
         if (url == null) {
             return@withContext ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "The server address isn't valid. Check it in Settings.")
         }
         val token = explicitToken ?: if (authorized) tokenProvider() else null
-        val request = requestBuilder(url, token).apply { if (body != null) post(body) }.build()
+        val request = requestBuilder(url, token).apply { if (body != null) method(httpMethod, body) }.build()
         try {
             http.newCall(request).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
@@ -183,6 +213,7 @@ class ApiClient(
             code = err?.code,
             httpStatus = status,
             retryable = err?.retryable ?: (status >= 500),
+            details = err?.details,
         )
     }
 
