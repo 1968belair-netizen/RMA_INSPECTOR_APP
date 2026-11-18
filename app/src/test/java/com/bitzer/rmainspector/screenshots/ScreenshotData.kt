@@ -65,15 +65,16 @@ object ScreenshotData {
         item("912352", "PART-0001", "Part", "part", "Repair & Return", "2026-10-30", estimated = true),
         item("912355", "CSH6553-50Y", "Screw", "screw", "Repair & Return", "2026-11-06", flags = listOf(core), serial = "25X0000010"),
         item("912357", "2KES-05Y", "Recip", "recip", "Inspection Only", "2026-11-13", serial = "25X0000012"),
+        item("912360", "4CES-9Y", "", "unknown", "Warranty", "2026-11-16", serial = "25X0000015"),
     )
     /** Fixed "today" so ages in screenshots never change. */
     val today: java.time.LocalDate = java.time.LocalDate.of(2026, 11, 18)
 
-    val workProductTypes = listOf("Recip", "Screw", "Scroll", "Part", "Transport", "Pressure Vessel", "System/Unit").map { c(it) }
+    val workProductTypes = listOf("Recip", "Screw", "Scroll", "Part", "Transport", "Pressure Vessel", "System/Unit", "(blank)").map { c(it) }
     val workReturnCodes = listOf("Core Buyback", "Core Credit", "Core&Inspection", "Cus Line Reject", "Freight Damage",
         "Inspection Only", "New & Unused", "Repair & Return", "Warranty").map { c(it) }
-    val defaultFilter = WorkListFilter(listOf("Recip", "Screw", "Scroll", "Part"),
-        listOf("Inspection Only", "Repair & Return", "Warranty").map { CodeKey(null, it) })
+    val defaultFilter = WorkListFilter(listOf("Recip", "Screw", "Scroll", "Part", "(blank)"),
+        listOf("Inspection Only", "Repair & Return", "Warranty").map { CodeKey(null, it) }, hasBlankChip = true)
 
     val homeDefault = HomeState(workList = WorkListState(productTypes = workProductTypes, returnCodes = workReturnCodes,
         filter = defaultFilter, items = workItems, loadedOnce = true))

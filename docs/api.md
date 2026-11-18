@@ -195,7 +195,7 @@ Response `200` (lists shortened):
     { "group": null, "code": "Core&Inspection", "description": "Core&Inspection" }
   ],
   "work_list_statuses":      [ { "group": null, "code": "Received" } ],
-  "work_list_product_types": [ "Recip", "Scroll", "Screw", "Part" ],
+  "work_list_product_types": [ "Recip", "Scroll", "Screw", "Part", "(blank)" ],
   "work_list_return_codes":  [ { "group": null, "code": "Inspection Only" }, { "group": null, "code": "Repair & Return" },
                                { "group": null, "code": "Warranty" } ],
   "status_roles": { "inspected": "Inspected", "report_complete": "Report Complete",
@@ -228,6 +228,10 @@ Notes:
   chips offer every value in `product_types` and `return_codes`. The server matches them **trimmed and
   uppercase** (Macola `Return_Code` is CHAR(15)). All are server settings, so they can change at the SAP rollout
   without an app update. Core&Inspection is not a default.
+- **`(blank)`** (decision 2026-11-18, issue #36) is a reserved product-type token meaning "product type is empty"
+  (§5). It is **not** a `product_types` value: the app always offers a "(blank)" chip, last in the product-type row,
+  and ticks it by default when `work_list_product_types` lists it. The default setting **includes `(blank)`**, so
+  Received RMAs with no product type never drop off the work list.
 - `status_roles` tells the app which statuses mean "inspected", "report complete" and "report already sent", for
   the submit and report dialogs (spec §6). Order of `inspection_statuses` = workflow order.
 - `normal_issue_codes`: the issue code(s) meaning "normal" (Macola: `50`). Guided steps default to it; checklist
@@ -302,11 +306,14 @@ Response `200`:
 - `product_type` = comma-separated product type values; `return_code` = comma-separated return-code `code`s
   (`group:code` when a group exists). **Omitted parameter = the server default** (`work_list_*`); an empty value
   matches nothing. Matching is trimmed, uppercase.
+- The reserved `product_type` token **`(blank)`** (issue #36) matches RMAs whose raw `product_type` is empty or
+  whitespace (even when `product_type_key` was derived from the model). It combines with other values like any
+  other value, e.g. `product_type=Recip,(blank)`; the return-code filter still applies. Real servers must support it.
 - Sort: **oldest `status_since` first, then RMA number.**
 - Scroll RMAs are listed (Scroll is a default product type) but open read-only (capabilities off).
 - Response: `{ "results": [ <search item shape> ], "generated_at": "..." }`.
 
-Example: `GET /rmas?product_type=Recip,Screw&return_code=Warranty,Repair%20%26%20Return`
+Example: `GET /rmas?product_type=Recip,Screw,(blank)&return_code=Warranty,Repair%20%26%20Return`
 
 **RMAs with a draft on this tablet** stay on that tablet's list even if they no longer match (return code or status
 changed); the app flags them "Return code / status changed" (spec §3). That is app-side; the server just lists.

@@ -68,12 +68,12 @@ def test_sign_in_required_and_token_lifecycle(anon):
 def test_work_list_received_only_filtered_and_oldest_first(client):
     cl = client.get("/api/v1/codelists").json()
     assert [s["code"] for s in cl["work_list_statuses"]] == ["Received"]
-    assert cl["work_list_product_types"] == ["Recip", "Scroll", "Screw", "Part"]
+    assert cl["work_list_product_types"] == ["Recip", "Scroll", "Screw", "Part", "(blank)"]
     assert [c["code"] for c in cl["work_list_return_codes"]] == ["Inspection Only", "Repair & Return", "Warranty"]
     assert cl["checklists"] == {} and cl["normal_issue_codes"] == [{"group": None, "code": "50"}]
     rows = client.get("/api/v1/rmas").json()["results"]
-    # Default filters: Received + Recip/Scroll/Screw/Part + IO/R&R/Warranty; oldest status_since first.
-    assert [r["rma_id"] for r in rows] == ["912346", "912348", "912345", "912352", "912355", "912357"]
+    # Default filters: Received + Recip/Scroll/Screw/Part/(blank) + IO/R&R/Warranty; oldest status_since first.
+    assert [r["rma_id"] for r in rows] == ["912346", "912348", "912345", "912352", "912355", "912357", "912360"]
     first = rows[0]
     assert first["return_code"] == {"group": None, "code": "Warranty", "description": "Warranty"}
     assert first["status_since"] == "2026-10-08" and first["status_since_estimated"] is False and first["locked"]
@@ -304,9 +304,25 @@ def test_no_token_bypass_and_no_inspectors_endpoint(anon, monkeypatch):
 
 def test_work_list_explicit_default_chips_match_server_default(client):
     """The app sends the chips it shows; the defaults sent explicitly give the default list (issue #17)."""
-    params = {"product_type": "Recip,Scroll,Screw,Part", "return_code": "Inspection Only,Repair & Return,Warranty"}
+    params = {"product_type": "Recip,Scroll,Screw,Part,(blank)", "return_code": "Inspection Only,Repair & Return,Warranty"}
     rows = client.get("/api/v1/rmas", params=params).json()["results"]
-    assert [r["rma_id"] for r in rows] == ["912346", "912348", "912345", "912352", "912355", "912357"]
+    assert [r["rma_id"] for r in rows] == ["912346", "912348", "912345", "912352", "912355", "912357", "912360"]
     params["product_type"] = "Recip,Screw,Part"
     rows = client.get("/api/v1/rmas", params=params).json()["results"]
     assert [r["rma_id"] for r in rows] == ["912346", "912345", "912352", "912355", "912357"]
+
+
+def test_work_list_blank_product_type_token(client):
+    """Issue #36: "(blank)" matches an empty product type; on by default, unticking it hides those RMAs."""
+    default_ids = [r["rma_id"] for r in client.get("/api/v1/rmas").json()["results"]]
+    assert "912360" in default_ids
+    rows = client.get("/api/v1/rmas", params={"product_type": "Recip,Scroll,Screw,Part"}).json()["results"]
+    assert "912360" not in {r["rma_id"] for r in rows}
+    # Only blank, matched trimmed/uppercase; return-code filter still applies (912350 blank, 912351 Core Credit).
+    rows = client.get("/api/v1/rmas", params={"product_type": " (BLANK) "}).json()["results"]
+    assert [r["rma_id"] for r in rows] == ["912360"]
+    assert rows[0]["product_type"] == "" and rows[0]["product_type_key"] == "unknown"
+    rows = client.get("/api/v1/rmas", params={"product_type": "(blank)", "return_code": "Core Credit"}).json()["results"]
+    assert [r["rma_id"] for r in rows] == ["912351"]
+    # Blank still is not matched by an empty parameter (empty = nothing).
+    assert client.get("/api/v1/rmas", params={"product_type": ""}).json()["results"] == []
