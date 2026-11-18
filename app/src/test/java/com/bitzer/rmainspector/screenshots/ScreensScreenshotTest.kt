@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import com.bitzer.rmainspector.ui.workspace.CameraPermissionPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -209,12 +210,12 @@ abstract class ScreenCatalog(private val device: String) {
     // Photo camera permission screens (issue #68): first ask, and after a denial (offers app settings).
     @Test fun camera_permission_ask() = shot("camera_permission_ask") {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.bitzer.rmainspector.ui.theme.BitzerColors.Black)) {
-            com.bitzer.rmainspector.ui.workspace.CameraPermissionPrompt(denied = false, onAllow = {}, onOpenSettings = {}, onCancel = {})
+            CameraPermissionPrompt(denied = false, onAllow = {}, onOpenSettings = {}, onCancel = {})
         }
     }
     @Test fun camera_permission_denied() = shot("camera_permission_denied") {
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(com.bitzer.rmainspector.ui.theme.BitzerColors.Black)) {
-            com.bitzer.rmainspector.ui.workspace.CameraPermissionPrompt(denied = true, onAllow = {}, onOpenSettings = {}, onCancel = {})
+            CameraPermissionPrompt(denied = true, onAllow = {}, onOpenSettings = {}, onCancel = {})
         }
     }
 
