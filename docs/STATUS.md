@@ -11,18 +11,16 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 ### Open PRs
 | PR | Issue | Branch | State |
 |---|---|---|---|
-| #37 | #36 A6 "(blank)" product-type chip | `feature/a6-blank-product-type` | build ✅ test ✅, emulator running. Merge when green. |
 | #40 | #10 C1 Report tab | `feature/c1-report-tab` | build ✅, emulator running. Merge when green and acceptance met. |
 | #42 | — | `docs/approve-q3-q4-q6` | Docs: Q3/4/6 approved; rebased on main after #39. |
 | (coming) | #19 D1 Camera search | `feature/d1-camera-search` | thread started 2026-11-18 ~13:35 |
 | (coming) | #7 B2 Photos | `feature/b2-photos` | thread started 2026-11-18 ~13:35 (B1 merged) |
 
-**Merged this session:** #39 B1 Findings tab (merged by Jacob).
+**Merged this session:** #39 B1 Findings tab (merged by Jacob); #37 A6 "(blank)" chip (squash 8777e16, 13:50 ET).
 
 ### Open issues
 | Issue | Milestone | State | Branch | Depends on |
 |---|---|---|---|---|
-| #36 A6 blank product-type chip | A | PR #37 | `feature/a6-blank-product-type` | — |
 | #10 C1 Report tab | C | PR #40 | `feature/c1-report-tab` | — |
 | #7 B2 Photos tab | B | **in progress** | `feature/b2-photos` | B1 ✅ |
 | #19 D1 Camera search | D | **in progress** | `feature/d1-camera-search` | — |
@@ -34,7 +32,7 @@ Read this first when resuming, then each in-progress issue's latest comment ("wh
 | #21 S1 Real server, read-only | server | **ready**, local on Jacob's laptop | — | — |
 | #22 S2 Real server, write side | server | later, local | — | matching tablet issues |
 
-(#5 B1 is closed by the merge.)
+(#5 B1 and #36 A6 are closed by their merges.)
 
 ## 2. Work in progress and exact next steps
 1. **#37 / #40:** when green and acceptance met → attempt the squash-merge (Jacob approves the prompt). If it is
@@ -75,5 +73,5 @@ Known CI/session quirks:
 
 ## 4. Open items in `docs/questions.md` (recommended option already built; Jacob may override)
 Q3, Q4 and Q6 were **approved as built on 2026-11-18** and moved to `docs/decisions.md`. Q5 was answered ("(blank)"
-chip, on by default); its row goes when PR #37 merges. Questions #7–10 are added by PR #39 (B1) when it merges, and
+chip, on by default) and its row was removed by #37. Questions #7–10 are added by PR #39 (B1) when it merges, and
 more by #40 (C1) — check the file on main.
