@@ -60,5 +60,7 @@ Serial numbers are `25X0000001` … `25X0000014`.
 Behaves like the Macola-era server: code `group` is `null`, `row_id` = `L<n>.<signature>`, no causes,
 three 4000-character summary blocks.
 
-Mock differences from the real server: thumbnails are the original bytes; the report PDF is a placeholder;
+Mock differences from the real server: thumbnails are the original bytes; the report PDF is a demo layout with fake wording;
 spell check only knows a few sample misspellings.
+
+Report PDF: `POST /report` builds a real demo PDF (`mock_server/report_pdf.py`, ReportLab + Pillow): disposition letter, report page, photo pages from the report photos actually stored.

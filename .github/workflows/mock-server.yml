@@ -22,3 +22,11 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: python -m pytest -q
+        env:
+          REPORT_PNG_DIR: ${{ runner.temp }}/report-previews
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-previews
+          path: ${{ runner.temp }}/report-previews
+          if-no-files-found: ignore
