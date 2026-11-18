@@ -11,6 +11,8 @@ import com.bitzer.rmainspector.data.DeletedRow
 import com.bitzer.rmainspector.data.Draft
 import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.FindingsEdit
+import com.bitzer.rmainspector.data.GuidedEngine
+import com.bitzer.rmainspector.data.GuidedProgress
 import com.bitzer.rmainspector.data.LocalPhoto
 import com.bitzer.rmainspector.data.PhotoProcessor
 import com.bitzer.rmainspector.data.PhotoSettings
@@ -20,6 +22,8 @@ import com.bitzer.rmainspector.data.ServiceLocator
 import com.bitzer.rmainspector.data.SubmitInput
 import com.bitzer.rmainspector.data.toDraftInspector
 import com.bitzer.rmainspector.data.toFindingRows
+import com.bitzer.rmainspector.ui.guided.guidedChecklist
+import com.bitzer.rmainspector.ui.guided.guidedStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,6 +57,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     private val drafts = ServiceLocator.drafts(app)
     private val recent = ServiceLocator.recentCodes(app)
     private val photoStore = ServiceLocator.photos(app)
+    private val guidedStore = ServiceLocator.guidedProgress(app)
     private val appContext = app.applicationContext
 
     /** Thumbnails for the Photos tab (device files + server thumbnails). */
@@ -71,6 +76,9 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     /** The draft as edited (null = none). Read from disk once per inspector. */
     private var draft: Draft? = null
     private var draftOwner: String? = null
+
+    /** Guided inspection progress of this inspector and RMA (null = never started). */
+    private var progress: GuidedProgress? = null
 
     private sealed interface DiskOp {
         data class Save(val draft: Draft) : DiskOp
@@ -135,6 +143,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
         if (username != draftOwner) {
             draft = username?.let { u -> withContext(Dispatchers.IO) { drafts.read(u, rma.rmaId) } }
             draftOwner = username
+            progress = username?.let { u -> withContext(Dispatchers.IO) { guidedStore.read(u, rma.rmaId) } }
         }
         val d = draft
         _state.update {
@@ -243,7 +252,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
                     val done = PhotoProcessor.process(raw, dest, photoSettings())
                     val photo = when (target) {
                         is CaptureTarget.Row -> LocalPhoto(id, LocalPhoto.KIND_PART, rowLocalId = target.localId, capturedAt = done.capturedAt, file = dest.name,
-                            bytes = done.bytes, sha256 = done.sha256, width = done.width, height = done.height)
+                            bytes = done.bytes, sha256 = done.sha256, width = done.width, height = done.height, slot = target.slot)
                         is CaptureTarget.Rma -> LocalPhoto(id, LocalPhoto.KIND_RMA, tag = target.tag, tagText = target.tagText, capturedAt = done.capturedAt, file = dest.name,
                             bytes = done.bytes, sha256 = done.sha256, width = done.width, height = done.height)
                         is CaptureTarget.Retake -> {
@@ -262,7 +271,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
                     val retake = target is CaptureTarget.Retake
                     it.copy(
                         selection = if (retake) photo.photoId else it.selection,
-                        photos = it.photos.copy(busy = false, takenThisSession = it.photos.takenThisSession + 1, capture = if (retake) null else it.photos.capture),
+                        photos = it.photos.copy(busy = false, takenThisSession = it.photos.takenThisSession + 1, capture = if (retake || (target is CaptureTarget.Row && target.slot != null)) null else it.photos.capture),
                     )
                 }
             }.onFailure {
@@ -274,7 +283,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     private fun updateGuided() {
         val rma = _state.value.rma ?: return
         val checklists = codeLists.state.value.lists?.checklists.orEmpty()
-        _state.update { it.copy(guided = guidedButtonFor(rma, checklists)) }
+        _state.update { it.copy(guided = guidedButtonFor(rma, checklists, progress)) }
     }
 
     fun selectTab(tab: WorkspaceTab) {
@@ -289,8 +298,91 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
 
     fun toggleFailureInfo() = _state.update { it.copy(failureExpanded = !it.failureExpanded) }
 
-    /** Guided inspection is built in milestone B; v1 has no checklists, so the button stays disabled. */
-    fun startGuided() = Unit
+    // ------------------------------------------------------------------------------------------ Guided inspection (D2)
+
+    /** Header button: Start or Continue. Opens the guided screen at the saved step (a new checklist version starts over). */
+    fun startGuided() {
+        val s = _state.value
+        val list = s.guidedChecklist() ?: return
+        if (!s.findingsEditable) return
+        val p = progress?.takeIf { it.version == list.version && !it.finished } ?: GuidedProgress(list.version, 0)
+        saveProgress(p)
+        _state.update { it.copy(guidedRun = GuidedRunState(p.step.coerceIn(0, list.steps.lastIndex))) }
+    }
+
+    private fun saveProgress(p: GuidedProgress) {
+        progress = p
+        val u = username()
+        if (u != null) viewModelScope.launch { withContext(Dispatchers.IO) { runCatching { guidedStore.write(u, rmaId, p) } } }
+        updateGuided()
+    }
+
+    /** The row of the current step; created with the default `50` Normal the first time the inspector touches the step. */
+    private fun guidedRow(): String? {
+        val s = _state.value
+        val list = s.guidedChecklist() ?: return null
+        val run = s.guidedRun ?: return null
+        val step = list.steps.getOrNull(run.step) ?: return null
+        GuidedEngine.rowFor(list.steps, run.step, rows())?.let { return it.localId }
+        if (!s.findingsEditable) return null
+        val codes = s.findings.codes
+        val part = codes?.parts?.firstOrNull { it.key == step.partCode } ?: Code(step.partCode.group, step.partCode.code)
+        val (next, id) = GuidedEngine.addRow(rows(), part, GuidedEngine.defaultIssue(codes))
+        commit(next)
+        return id
+    }
+
+    fun guidedSetIssue(code: Code) { guidedRow()?.let { setIssue(it, code) } }
+
+    fun guidedSetNote(note: String) { guidedRow()?.let { setNote(it, note) } }
+
+    /** Opens the camera for [slot] of the current step; the row is created first so the photo has a home. */
+    fun guidedTakePhoto(slot: String) {
+        if (!_state.value.photosEditable) return
+        val id = guidedRow() ?: return
+        _state.update { it.copy(photos = it.photos.copy(capture = CaptureTarget.Row(id, slot), takenThisSession = 0, message = null)) }
+    }
+
+    /** Next: needs the required items; writes the step into Findings (issue defaults to Normal) and moves on. */
+    fun guidedNext() {
+        val st = _state.value.guidedStatus() ?: return
+        if (!st.canNext) return
+        val id = guidedRow() ?: return
+        val row = rows().firstOrNull { it.localId == id }
+        if (row != null && row.issueCode == null) st.issue?.let { commit(FindingsEdit.setIssue(rows(), id, it)) }
+        guidedAdvance()
+    }
+
+    /** Skip: leaves the step as it is (nothing is written); disabled while a required photo is missing. */
+    fun guidedSkip() {
+        val st = _state.value.guidedStatus() ?: return
+        if (st.canSkip) guidedAdvance()
+    }
+
+    private fun guidedAdvance() {
+        val s = _state.value
+        val list = s.guidedChecklist() ?: return
+        val run = s.guidedRun ?: return
+        if (run.step < list.steps.lastIndex) {
+            saveProgress(GuidedProgress(list.version, run.step + 1))
+            _state.update { it.copy(guidedRun = run.copy(step = run.step + 1)) }
+        } else {
+            saveProgress(GuidedProgress(list.version, run.step, finished = true))
+            _state.update { it.copy(guidedRun = run.copy(complete = true)) }
+        }
+    }
+
+    fun guidedBack() {
+        val s = _state.value
+        val list = s.guidedChecklist() ?: return
+        val run = s.guidedRun ?: return
+        if (run.step <= 0) return
+        saveProgress(GuidedProgress(list.version, run.step - 1))
+        _state.update { it.copy(guidedRun = run.copy(step = run.step - 1)) }
+    }
+
+    /** Leave the guided screen; progress stays, so the header button says Continue. */
+    fun guidedExit() = _state.update { it.copy(guidedRun = null) }
 
     /** Conflict review (spec §6.5) comes with Submit in milestone B. */
     fun reviewChanges() = Unit

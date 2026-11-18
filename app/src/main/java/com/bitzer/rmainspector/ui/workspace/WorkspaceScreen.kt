@@ -69,6 +69,8 @@ import com.bitzer.rmainspector.data.PartRow
 import com.bitzer.rmainspector.data.RmaDetail
 import com.bitzer.rmainspector.ui.components.BitzerTopBar
 import com.bitzer.rmainspector.ui.components.InfoBanner
+import com.bitzer.rmainspector.ui.guided.GuidedCallbacks
+import com.bitzer.rmainspector.ui.guided.GuidedOverlay
 import com.bitzer.rmainspector.ui.theme.BitzerColors
 
 /** Test tags used by the emulator tests. */
@@ -115,6 +117,8 @@ data class WorkspaceCallbacks(
     val onDismissPhotoMessage: () -> Unit = {},
     /** Report tab actions (C1). */
     val report: ReportCallbacks = ReportCallbacks(),
+    /** Guided inspection screen actions (D2). */
+    val guided: GuidedCallbacks = GuidedCallbacks(),
     /** Submit inspection actions (B3). */
     val submit: SubmitCallbacks = SubmitCallbacks(),
 )
@@ -152,6 +156,17 @@ fun WorkspaceScreen(
     WorkspaceContent(
         state,
         WorkspaceCallbacks(
+            guided = GuidedCallbacks(
+                onIssue = vm::guidedSetIssue,
+                onNote = vm::guidedSetNote,
+                onTakePhoto = vm::guidedTakePhoto,
+                onRetake = vm::retakePhoto,
+                onDeletePhoto = vm::deletePhoto,
+                onNext = vm::guidedNext,
+                onSkip = vm::guidedSkip,
+                onBack = vm::guidedBack,
+                onExit = vm::guidedExit,
+            ),
             submit = SubmitCallbacks(
                 onOpen = { inspectionVm.open(vm.submitInput()) },
                 onCancel = inspectionVm::cancel,
@@ -238,6 +253,7 @@ fun WorkspaceContent(
     CompositionLocalProvider(LocalPhotoThumbs provides (thumbs ?: LocalPhotoThumbs.current)) {
         Box(Modifier.fillMaxSize()) {
             WorkspaceScaffold(state, callbacks)
+            GuidedOverlay(state, callbacks.guided)
             TagPickerOverlay(state, callbacks)
             SubmitOverlay(state.submit, callbacks.submit)
             overlay(state, callbacks)

@@ -6,6 +6,7 @@ import com.bitzer.rmainspector.data.Checklist
 import com.bitzer.rmainspector.data.ChecklistStep
 import com.bitzer.rmainspector.data.CodeKey
 import com.bitzer.rmainspector.data.CodeLists
+import com.bitzer.rmainspector.data.GuidedProgress
 import com.bitzer.rmainspector.data.LockState
 import com.bitzer.rmainspector.data.RmaDetail
 import org.junit.Assert.assertEquals
@@ -86,5 +87,19 @@ class WorkspaceStateTest {
         assertEquals("non_normal", steps[0].photos[1].requiredWhen)
         assertEquals("07a", steps[1].partCode.code)
         assertTrue(ApiClient.defaultJson.decodeFromString(CodeLists.serializer(), """{"checklists": {}}""").checklists.isEmpty())
+    }
+
+    @Test fun guidedButtonFollowsProgress() {
+        val list = Checklist("v1", listOf(ChecklistStep(CodeKey(null, "07a")), ChecklistStep(CodeKey(null, "48a")), ChecklistStep(CodeKey(null, "63"))))
+        val lists = mapOf("recip" to list)
+        assertEquals(GuidedButton.Start(3), guidedButtonFor(recip, lists, null))
+        assertEquals(GuidedButton.Continue(2, 3), guidedButtonFor(recip, lists, GuidedProgress("v1", 1)))
+        assertEquals("Continue (step 2 of 3)", guidedButtonFor(recip, lists, GuidedProgress("v1", 1)).label())
+        assertEquals(GuidedButton.Complete, guidedButtonFor(recip, lists, GuidedProgress("v1", 2, finished = true)))
+        // A new checklist version on the server starts over.
+        assertEquals(GuidedButton.Start(3), guidedButtonFor(recip, lists, GuidedProgress("v0", 1)))
+        // Read-only RMAs and types without a list stay disabled.
+        assertTrue(guidedButtonFor(scroll, lists, GuidedProgress("v1", 1)) is GuidedButton.Unavailable)
+        assertEquals("No guided list for Recip yet", guidedButtonFor(recip, emptyMap(), GuidedProgress("v1", 1)).label())
     }
 }
