@@ -78,6 +78,8 @@ data class ReportCallbacks(
     val onTogglePartsExpanded: () -> Unit = {},
     val onDismissMessage: () -> Unit = {},
     val onRetryPhotos: () -> Unit = {},
+    /** "Submit report" (C2): spell check, build, preview. */
+    val onSubmitReport: () -> Unit = {},
     /** Loads a photo as an image (`folder` = `all` / `report`); null = not available (placeholder tile). */
     val loadImage: suspend (folder: String, filename: String, thumb: Boolean) -> ImageBitmap? = { _, _, _ -> null },
 )

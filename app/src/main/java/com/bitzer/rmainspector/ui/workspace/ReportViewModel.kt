@@ -112,6 +112,9 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
         }
     }
 
+    /** The submit flow changed the draft (fixed spelling, saved photos): take it over. */
+    fun applyDraft(d: ReportDraft) = edit { d }
+
     fun toggleShowAll() = _state.update { it.copy(showAll = !it.showAll) }
     fun enlarge(filename: String?) = _state.update { it.copy(enlarged = filename) }
     fun togglePartsExpanded() = _state.update { it.copy(partsExpanded = !it.partsExpanded) }

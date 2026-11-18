@@ -60,18 +60,18 @@ object SubmitTags {
 
 /** The full-screen layer of the submit flow; draws nothing while [phase] is Closed. */
 @Composable
-fun SubmitOverlay(phase: SubmitPhase, cb: SubmitCallbacks) {
+fun SubmitOverlay(phase: InspectionSubmitPhase, cb: SubmitCallbacks) {
     when (phase) {
-        SubmitPhase.Closed -> Unit
-        is SubmitPhase.Review -> {
+        InspectionSubmitPhase.Closed -> Unit
+        is InspectionSubmitPhase.Review -> {
             Box(Modifier.fillMaxSize()) {
                 ReviewScreen(phase.review, cb)
                 if (phase.warning) ReportAlreadyDialog(phase.review.plan.kind, phase.review.plan.current?.code.orEmpty(), cb.onConfirmWarning, cb.onDismissWarning)
             }
         }
-        is SubmitPhase.Working -> WorkingScreen(phase)
-        is SubmitPhase.Done -> DoneScreen(phase.done, cb)
-        is SubmitPhase.Failed -> SubmitProblemDialog(phase.problem, cb.onClose)
+        is InspectionSubmitPhase.Working -> WorkingScreen(phase)
+        is InspectionSubmitPhase.Done -> DoneScreen(phase.done, cb)
+        is InspectionSubmitPhase.Failed -> SubmitProblemDialog(phase.problem, cb.onClose)
     }
 }
 
@@ -163,7 +163,7 @@ private fun ReviewScreen(r: SubmitReview, cb: SubmitCallbacks) {
 }
 
 @Composable
-private fun WorkingScreen(w: SubmitPhase.Working) {
+private fun WorkingScreen(w: InspectionSubmitPhase.Working) {
     Surface(color = BitzerColors.White, modifier = Modifier.fillMaxSize().testTag(SubmitTags.WORKING)) {
         Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {

@@ -21,19 +21,19 @@ data class SubmitDone(
 )
 
 /** The submit flow (spec §6.1): review → (status warning) → saving / uploading → done, or a problem dialog. */
-sealed interface SubmitPhase {
-    data object Closed : SubmitPhase
+sealed interface InspectionSubmitPhase {
+    data object Closed : InspectionSubmitPhase
 
     /** Review screen; [warning] = the "Report already complete / sent" dialog is showing on top. */
-    data class Review(val review: SubmitReview, val warning: Boolean = false) : SubmitPhase
+    data class Review(val review: SubmitReview, val warning: Boolean = false) : InspectionSubmitPhase
 
     /** [total] = 0 while the findings are being saved; then photos [done] of [total]. */
-    data class Working(val step: String, val done: Int = 0, val total: Int = 0) : SubmitPhase
+    data class Working(val step: String, val done: Int = 0, val total: Int = 0) : InspectionSubmitPhase
 
-    data class Done(val done: SubmitDone) : SubmitPhase
+    data class Done(val done: SubmitDone) : InspectionSubmitPhase
 
     /** Nothing was lost: the draft and the photos are still on the tablet. */
-    data class Failed(val problem: SubmitProblem) : SubmitPhase
+    data class Failed(val problem: SubmitProblem) : InspectionSubmitPhase
 }
 
 /** Callbacks of the submit screens. */
@@ -53,4 +53,4 @@ data class SubmitCallbacks(
 
 /** Submit is offered on Findings and Photos while something can be edited. */
 val WorkspaceState.submitAvailable: Boolean
-    get() = (findingsEditable || photosEditable) && tab != WorkspaceTab.REPORT && submit == SubmitPhase.Closed
+    get() = (findingsEditable || photosEditable) && tab != WorkspaceTab.REPORT && submit == InspectionSubmitPhase.Closed

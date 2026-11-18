@@ -128,26 +128,37 @@ fun WorkspaceScreen(
     onBack: () -> Unit,
     vm: WorkspaceViewModel = viewModel(),
     reportVm: ReportViewModel = viewModel(),
-    submitVm: SubmitViewModel = viewModel(),
+    submitVm: ReportSubmitViewModel = viewModel(),
+    inspectionVm: SubmitViewModel = viewModel(),
 ) {
     val base by vm.state.collectAsStateWithLifecycle()
     val report by reportVm.state.collectAsStateWithLifecycle()
-    val submit by submitVm.phase.collectAsStateWithLifecycle()
+    val inspection by inspectionVm.phase.collectAsStateWithLifecycle()
     val rma = base.rma
     LaunchedEffect(rma) { if (rma != null) reportVm.setRma(rma) }
-    // The submit saved something: the draft is gone, so reload the RMA from the server.
-    LaunchedEffect(Unit) { submitVm.refresh.collect { vm.afterSubmit() } }
-    val state = base.copy(report = report, submit = submit)
+    // The inspection submit saved something: the draft is gone, so reload the RMA from the server.
+    LaunchedEffect(Unit) { inspectionVm.refresh.collect { vm.afterSubmit() } }
+    val submit by submitVm.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        submitVm.events.collect { e ->
+            when (e) {
+                is SubmitEvent.DraftChanged -> reportVm.applyDraft(e.draft)
+                SubmitEvent.ReloadRma -> vm.load()
+                SubmitEvent.ReloadPhotos -> reportVm.loadPhotos()
+            }
+        }
+    }
+    val state = base.copy(report = report, submit = inspection)
     WorkspaceContent(
         state,
         WorkspaceCallbacks(
             submit = SubmitCallbacks(
-                onOpen = { submitVm.open(vm.submitInput()) },
-                onCancel = submitVm::cancel,
-                onSubmit = submitVm::submit,
-                onConfirmWarning = submitVm::confirmWarning,
-                onDismissWarning = submitVm::dismissWarning,
-                onClose = submitVm::close,
+                onOpen = { inspectionVm.open(vm.submitInput()) },
+                onCancel = inspectionVm::cancel,
+                onSubmit = inspectionVm::submit,
+                onConfirmWarning = inspectionVm::confirmWarning,
+                onDismissWarning = inspectionVm::dismissWarning,
+                onClose = inspectionVm::close,
             ),
             report = ReportCallbacks(
                 onToggleShowAll = reportVm::toggleShowAll,
@@ -169,6 +180,9 @@ fun WorkspaceScreen(
                 onTogglePartsExpanded = reportVm::togglePartsExpanded,
                 onDismissMessage = reportVm::dismissMessage,
                 onRetryPhotos = reportVm::loadPhotos,
+                onSubmitReport = {
+                    rma?.let { submitVm.begin(it, report.draft, report.lists.summaryBlocks.associate { b -> b.blockId to b.label }, base.findings.hasDraft) }
+                },
                 loadImage = reportVm::loadImage,
             ),
             onBack = onBack,
@@ -201,7 +215,14 @@ fun WorkspaceScreen(
             onDismissPhotoMessage = vm::dismissPhotoMessage,
         ),
         thumbs = vm.thumbs,
-        overlay = { s, cb -> if (s.photos.capture != null) CameraOverlay(s.photos, cb) },
+        overlay = { s, cb ->
+            if (s.photos.capture != null) CameraOverlay(s.photos, cb)
+            ReportSubmitOverlay(submit, ReportSubmitCallbacks(
+                onConfirm = submitVm::confirm, onCancel = submitVm::cancel, onFix = submitVm::fix, onIgnore = submitVm::ignore,
+                onAddToDictionary = submitVm::addToDictionary, onSpellContinue = submitVm::spellContinue,
+                onErrorOk = submitVm::errorOk, onRetry = submitVm::retry, onNeedPage = submitVm::needPage,
+                onDonePreview = submitVm::donePreview))
+        },
     )
 }
 

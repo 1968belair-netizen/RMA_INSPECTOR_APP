@@ -44,8 +44,8 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     private val photoStore = ServiceLocator.photos(app)
     private val reportDrafts = ServiceLocator.reportDrafts(app)
 
-    private val _phase = MutableStateFlow<SubmitPhase>(SubmitPhase.Closed)
-    val phase: StateFlow<SubmitPhase> = _phase.asStateFlow()
+    private val _phase = MutableStateFlow<InspectionSubmitPhase>(InspectionSubmitPhase.Closed)
+    val phase: StateFlow<InspectionSubmitPhase> = _phase.asStateFlow()
 
     private val _refresh = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
 
@@ -57,37 +57,37 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
 
     /** Submit tapped: shows the review screen for [snapshot] (null = the RMA isn't loaded yet → nothing happens). */
     fun open(snapshot: SubmitInput?) {
-        if (snapshot == null || _phase.value != SubmitPhase.Closed) return
+        if (snapshot == null || _phase.value != InspectionSubmitPhase.Closed) return
         input = snapshot
-        _phase.value = SubmitPhase.Review(SubmitReview.build(snapshot))
+        _phase.value = InspectionSubmitPhase.Review(SubmitReview.build(snapshot))
     }
 
-    fun cancel() { if (_phase.value is SubmitPhase.Review) _phase.value = SubmitPhase.Closed }
+    fun cancel() { if (_phase.value is InspectionSubmitPhase.Review) _phase.value = InspectionSubmitPhase.Closed }
 
     /** SUBMIT on the review screen. Report Complete / sent RMAs ask first. */
     fun submit() {
-        val r = (_phase.value as? SubmitPhase.Review)?.review ?: return
+        val r = (_phase.value as? InspectionSubmitPhase.Review)?.review ?: return
         if (!r.canSubmit) return
-        if (r.plan.rebuildsReport) _phase.value = SubmitPhase.Review(r, warning = true) else run(r)
+        if (r.plan.rebuildsReport) _phase.value = InspectionSubmitPhase.Review(r, warning = true) else run(r)
     }
 
     fun confirmWarning() {
-        val r = (_phase.value as? SubmitPhase.Review)?.review ?: return
+        val r = (_phase.value as? InspectionSubmitPhase.Review)?.review ?: return
         run(r)
     }
 
     fun dismissWarning() {
-        val s = _phase.value as? SubmitPhase.Review ?: return
+        val s = _phase.value as? InspectionSubmitPhase.Review ?: return
         _phase.value = s.copy(warning = false)
     }
 
     /** Closes the problem dialog or the done screen. */
-    fun close() { _phase.value = SubmitPhase.Closed }
+    fun close() { _phase.value = InspectionSubmitPhase.Closed }
 
     private fun run(review: SubmitReview) {
         val inp = input ?: return
         val plan = review.plan
-        _phase.value = SubmitPhase.Working("Saving findings…")
+        _phase.value = InspectionSubmitPhase.Working("Saving findings…")
         viewModelScope.launch {
             val base = settings.settings.first().serverUrl
             val payloadFor = { id: String -> SubmitPayload.build(inp, plan, id, Draft.nowIso()) }
@@ -119,7 +119,7 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
             _refresh.emit(Unit)
 
             val upload: PhotoUploadSummary = if (photos.isEmpty()) PhotoUploadSummary(0, emptyList(), 0, false) else {
-                _phase.value = SubmitPhase.Working("Uploading photos…", 0, photos.size)
+                _phase.value = InspectionSubmitPhase.Working("Uploading photos…", 0, photos.size)
                 withContext(Dispatchers.IO) {
                     PhotoUploadRunner.run(
                         photos, rows,
@@ -133,7 +133,7 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
                             }
                         },
                         markSent = { photo, name -> photoStore.markSent(inp.username, rmaId, photo.photoId, name) },
-                        onProgress = { done, total -> _phase.value = SubmitPhase.Working("Uploading photos…", done, total) },
+                        onProgress = { done, total -> _phase.value = InspectionSubmitPhase.Working("Uploading photos…", done, total) },
                     )
                 }
             }
@@ -141,14 +141,14 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
             var rebuilt: Boolean? = null
             var rebuildProblem: String? = null
             if (plan.rebuildsReport) {
-                _phase.value = SubmitPhase.Working("Rebuilding the report…")
+                _phase.value = InspectionSubmitPhase.Working("Rebuilding the report…")
                 when (val r = api.rebuildReportAfterSubmit(base, rmaId, UUID.randomUUID().toString())) {
                     is ApiResult.Ok -> rebuilt = true
                     is ApiResult.Failure -> { rebuilt = false; rebuildProblem = r.message }
                 }
             }
             _refresh.emit(Unit)
-            _phase.value = SubmitPhase.Done(
+            _phase.value = InspectionSubmitPhase.Done(
                 SubmitDone(
                     status = plan.resultingStatus,
                     statusChanged = plan.kind == SubmitKind.SET_INSPECTED,
@@ -164,5 +164,5 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
         }
     }
 
-    private fun fail(p: SubmitProblem) { _phase.value = SubmitPhase.Failed(p) }
+    private fun fail(p: SubmitProblem) { _phase.value = InspectionSubmitPhase.Failed(p) }
 }

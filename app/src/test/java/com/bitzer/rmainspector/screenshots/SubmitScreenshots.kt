@@ -12,7 +12,7 @@ import com.bitzer.rmainspector.data.SubmitInput
 import com.bitzer.rmainspector.data.SubmitReview
 import com.bitzer.rmainspector.ui.theme.RmaInspectorTheme
 import com.bitzer.rmainspector.ui.workspace.SubmitDone
-import com.bitzer.rmainspector.ui.workspace.SubmitPhase
+import com.bitzer.rmainspector.ui.workspace.InspectionSubmitPhase
 import com.bitzer.rmainspector.ui.workspace.WorkspaceCallbacks
 import com.bitzer.rmainspector.ui.workspace.WorkspaceContent
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 abstract class SubmitCatalog(private val device: String) {
     @get:Rule val compose = createComposeRule()
 
-    private fun shot(name: String, phase: SubmitPhase) {
+    private fun shot(name: String, phase: InspectionSubmitPhase) {
         compose.setContent {
             RmaInspectorTheme {
                 WorkspaceContent(ScreenshotData.workspaceFindings.copy(submit = phase), WorkspaceCallbacks())
@@ -51,26 +51,26 @@ abstract class SubmitCatalog(private val device: String) {
         return SubmitReview.build(SubmitInput(r, r, r.signature, rows, photos, ScreenshotData.findingCodes, null, "demo", "device-1"))
     }
 
-    @Test fun submit_review() = shot("submit_review", SubmitPhase.Review(review()))
-    @Test fun submit_review_incomplete_row() = shot("submit_review_incomplete_row", SubmitPhase.Review(review(rows = ScreenshotData.findingRows)))
-    @Test fun submit_review_report_complete() = shot("submit_review_report_complete", SubmitPhase.Review(review("Report Complete")))
+    @Test fun submit_review() = shot("submit_review", InspectionSubmitPhase.Review(review()))
+    @Test fun submit_review_incomplete_row() = shot("submit_review_incomplete_row", InspectionSubmitPhase.Review(review(rows = ScreenshotData.findingRows)))
+    @Test fun submit_review_report_complete() = shot("submit_review_report_complete", InspectionSubmitPhase.Review(review("Report Complete")))
     @Test fun submit_report_already_complete_dialog() =
-        shot("submit_report_already_complete_dialog", SubmitPhase.Review(review("Report Complete"), warning = true))
+        shot("submit_report_already_complete_dialog", InspectionSubmitPhase.Review(review("Report Complete"), warning = true))
     @Test fun submit_report_already_sent_warning() =
-        shot("submit_report_already_sent_warning", SubmitPhase.Review(review("Sent to RSM"), warning = true))
-    @Test fun submit_saving() = shot("submit_saving", SubmitPhase.Working("Saving findings…"))
-    @Test fun submit_uploading() = shot("submit_uploading", SubmitPhase.Working("Uploading photos…", 2, 5))
-    @Test fun submit_success() = shot("submit_success", SubmitPhase.Done(SubmitDone("Inspected", statusChanged = true, partsSaved = true, photosSent = 3)))
+        shot("submit_report_already_sent_warning", InspectionSubmitPhase.Review(review("Sent to RSM"), warning = true))
+    @Test fun submit_saving() = shot("submit_saving", InspectionSubmitPhase.Working("Saving findings…"))
+    @Test fun submit_uploading() = shot("submit_uploading", InspectionSubmitPhase.Working("Uploading photos…", 2, 5))
+    @Test fun submit_success() = shot("submit_success", InspectionSubmitPhase.Done(SubmitDone("Inspected", statusChanged = true, partsSaved = true, photosSent = 3)))
     @Test fun submit_success_report_rebuilt() = shot("submit_success_report_rebuilt",
-        SubmitPhase.Done(SubmitDone("Report Complete", statusChanged = false, partsSaved = true, photosSent = 0, reportRebuilt = true)))
+        InspectionSubmitPhase.Done(SubmitDone("Report Complete", statusChanged = false, partsSaved = true, photosSent = 0, reportRebuilt = true)))
     @Test fun submit_success_photo_problem() = shot("submit_success_photo_problem",
-        SubmitPhase.Done(SubmitDone("Inspected", statusChanged = true, partsSaved = true, photosSent = 1,
+        InspectionSubmitPhase.Done(SubmitDone("Inspected", statusChanged = true, partsSaved = true, photosSent = 1,
             photoProblems = listOf("Can't reach the server at http://rma-server.example.invalid.")))
     )
     @Test fun submit_offline() = shot("submit_offline",
-        SubmitPhase.Failed(SubmitErrors.map(ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "Can't reach the server.", retryable = true))))
+        InspectionSubmitPhase.Failed(SubmitErrors.map(ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "Can't reach the server.", retryable = true))))
     @Test fun submit_changed_elsewhere() = shot("submit_changed_elsewhere",
-        SubmitPhase.Failed(SubmitErrors.map(ApiResult.Failure(ApiResult.Kind.SERVER_ERROR,
+        InspectionSubmitPhase.Failed(SubmitErrors.map(ApiResult.Failure(ApiResult.Kind.SERVER_ERROR,
             "Someone changed RMA 912345 after you loaded it. Nothing was saved.", code = "RMA_CHANGED", httpStatus = 409))))
 }
 
