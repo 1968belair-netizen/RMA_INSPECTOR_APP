@@ -8,7 +8,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -30,7 +29,8 @@ class SmokeTest {
         compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
         compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
         compose.onNodeWithText("Example Refrigeration Co.").assertExists()
-        Espresso.pressBack()
+        // App-level back (Espresso's pressBack waits for window focus, which the keyboard can hold on CI emulators).
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 10_000)
     }
 }
