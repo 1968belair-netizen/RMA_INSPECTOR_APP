@@ -13,6 +13,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.bitzer.rmainspector.data.ServiceLocator
+import java.net.HttpURLConnection
+import java.net.URL
 import com.bitzer.rmainspector.ui.signin.SignInTags
 import org.junit.Rule
 import org.junit.Test
@@ -57,5 +61,46 @@ class SmokeTest {
         compose.waitUntilAtLeastOneExists(hasText("Sign out", substring = true), timeoutMillis = 10_000)
         compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
         compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 10_000)
+    }
+
+    /**
+     * Decision 2026-11-18: if the server rejects the token mid-session, signing in again returns the user to the
+     * screen and RMA they were on. The token is revoked here by calling the mock's /auth/logout directly.
+     */
+    @Test
+    fun reSignInReturnsToTheSameRma() {
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN") or hasText("FIND AN RMA"), timeoutMillis = 15_000)
+        if (compose.onAllNodes(hasText("SIGN IN")).fetchSemanticsNodes().isNotEmpty()) signInAsDemo()
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 15_000)
+
+        compose.onNode(hasSetTextAction()).performTextInput("912345")
+        compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
+
+        // Revoke the token on the server, then make the screen call the server again → 401 → sign-in.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val token = checkNotNull(ServiceLocator.auth(context).token)
+        val revoke = Thread {
+            val c = URL(BuildConfig.DEFAULT_SERVER_URL.trimEnd('/') + "/auth/logout").openConnection() as HttpURLConnection
+            c.requestMethod = "POST"
+            c.setRequestProperty("Authorization", "Bearer $token")
+            c.doOutput = true
+            c.outputStream.close()
+            c.responseCode
+            c.disconnect()
+        }
+        revoke.start(); revoke.join()
+        compose.onNode(hasContentDescription("Refresh") and hasClickAction()).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
+
+        signInAsDemo()
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE CONTEXT"), timeoutMillis = 15_000)
+        compose.onNodeWithText("Example Refrigeration Co.").assertExists()
+    }
+
+    private fun signInAsDemo() {
+        compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
+        compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("demo")
+        compose.onNodeWithTag(SignInTags.SUBMIT).performClick()
     }
 }

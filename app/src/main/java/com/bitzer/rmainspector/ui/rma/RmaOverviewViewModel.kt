@@ -10,7 +10,11 @@ import com.bitzer.rmainspector.data.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 sealed interface OverviewState {
@@ -29,6 +33,10 @@ class RmaOverviewViewModel(app: Application, saved: SavedStateHandle) : AndroidV
 
     init {
         load()
+        // After a mid-session re-sign-in the user comes back to this screen: reload with the new token.
+        viewModelScope.launch {
+            ServiceLocator.auth(app).session.map { it?.token }.distinctUntilChanged().drop(1).filterNotNull().collect { load() }
+        }
     }
 
     fun load() {

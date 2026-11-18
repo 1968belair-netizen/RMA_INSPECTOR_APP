@@ -78,6 +78,14 @@ class AuthStore(private val prefs: SharedPreferences, private val box: SecretBox
 
     val token: String? get() = _session.value?.token
 
+    /**
+     * True when the session ended because the server rejected the token (401), not because the user signed out.
+     * The app then shows sign-in on top of the current screen and returns there after signing in (decision
+     * 2026-11-18). Cleared by the next sign-in or an explicit sign-out. Not persisted.
+     */
+    private val _expired = MutableStateFlow(false)
+    val expired: StateFlow<Boolean> = _expired.asStateFlow()
+
     /** Random per install, not a hardware id (api §1 `X-Device-Id`). */
     val deviceId: String by lazy {
         prefs.getString(KEY_DEVICE, null) ?: UUID.randomUUID().toString().also { prefs.edit().putString(KEY_DEVICE, it).apply() }
@@ -91,18 +99,26 @@ class AuthStore(private val prefs: SharedPreferences, private val box: SecretBox
             .putString(KEY_SESSION, box.encrypt(plain))
             .putString(KEY_LAST_USER, session.user.username)
             .apply()
+        _expired.value = false
         _session.value = session
     }
 
-    /** Sign out: forget the token. Nothing else (queued work, settings) is touched. */
+    /**
+     * Sign out: forget the token. Nothing else (queued work, settings) is touched. Only the token and the user's
+     * name/initials are ever stored — never the password.
+     */
     fun clear() {
         prefs.edit().remove(KEY_SESSION).apply()
+        _expired.value = false
         _session.value = null
     }
 
     /** The server rejected [token] (401). Only forget it if it is still the current one. */
     fun expire(token: String) {
-        if (_session.value?.token == token) clear()
+        if (_session.value?.token != token) return
+        prefs.edit().remove(KEY_SESSION).apply()
+        _expired.value = true
+        _session.value = null
     }
 
     private fun load(): Session? {
