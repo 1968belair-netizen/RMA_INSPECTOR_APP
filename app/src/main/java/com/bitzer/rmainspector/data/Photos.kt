@@ -342,6 +342,9 @@ object PhotoMath {
     }
 
     /** Largest power-of-two `inSampleSize` that still leaves the long edge at least [maxEdge] (cheap first decode). */
+    /** Free bytes needed to process a photo: twice the camera file (decode + re-encode) but never less than [floor]. */
+    fun requiredFreeBytes(sourceBytes: Long, floor: Long): Long = maxOf(floor, sourceBytes * 2)
+
     fun sampleSize(width: Int, height: Int, maxEdge: Int): Int {
         var s = 1
         val longEdge = maxOf(width, height)

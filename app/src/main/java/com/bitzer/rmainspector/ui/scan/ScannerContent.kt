@@ -41,6 +41,8 @@ sealed interface ScannerState {
     /** Camera permission not granted yet; [blocked] = the system will no longer ask (open Settings). */
     data class NeedsPermission(val blocked: Boolean = false) : ScannerState
     data object NoCamera : ScannerState
+    /** The device has a camera but it could not be opened (busy in another app, disabled by policy, hardware error). */
+    data object CameraUnavailable : ScannerState
     /** Live preview; [reading] = a plate photo is being read. */
     data class Scanning(val mode: ScanMode, val reading: Boolean = false) : ScannerState
     /** Plate text recognised: the inspector picks the line to search for. */
@@ -54,6 +56,7 @@ object ScannerTags {
     const val CLOSE = "scan-close"
     const val CAPTURE = "scan-capture"
     const val GRANT = "scan-grant"
+    const val RETRY = "scan-retry"
     fun mode(m: ScanMode) = "scan-mode-${m.name.lowercase()}"
     fun line(i: Int) = "scan-line-$i"
 }
@@ -107,6 +110,8 @@ fun ScannerContent(
                 actionTag = ScannerTags.GRANT,
             )
             ScannerState.NoCamera -> Message("No camera found", "This device has no usable camera. Type the number instead.", "Close", onClose)
+            ScannerState.CameraUnavailable -> Message("The camera couldn't be started",
+                "Another app may be using it. Close other camera apps, then try again. You can also type the number instead.", "Try again", onRetry, ScannerTags.RETRY)
             ScannerState.NothingRead -> Message("Nothing readable found", "Hold the plate steady and well lit, then try again.", "Try again", onRetry, ScannerTags.CAPTURE)
             is ScannerState.PickLine -> PickLineSheet(state.lines, onPickLine, onRetry)
             is ScannerState.Scanning -> Bottom {
