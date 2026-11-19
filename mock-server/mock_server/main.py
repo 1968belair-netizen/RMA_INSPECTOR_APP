@@ -58,9 +58,15 @@ def norm(text: Optional[str]) -> str:
 FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64 + b"\xff\xd9"
 
 
+# Runtime override of the dataset (test hook POST /_mock/dataset): None = follow MOCK_DATASET.
+_DATASET_OVERRIDE: Optional[str] = None
+
+
 def demo_mode() -> bool:
-    """MOCK_DATASET=demo selects the curated demo dataset; anything else = the default test dataset."""
-    return os.environ.get("MOCK_DATASET", "").strip().lower() == "demo"
+    """MOCK_DATASET=demo selects the curated demo dataset; anything else = the default test dataset.
+    A runtime override (POST /api/v1/_mock/dataset, used by the emulator test of the guided inspection) wins."""
+    name = _DATASET_OVERRIDE if _DATASET_OVERRIDE is not None else os.environ.get("MOCK_DATASET", "")
+    return name.strip().lower() == "demo"
 
 
 def wl_product_types() -> list:
@@ -947,6 +953,21 @@ async def add_to_dictionary(request: Request):
 def mock_reset():
     store.reset()
     return {"ok": True}
+
+
+@api.post("/_mock/dataset")
+async def mock_dataset(request: Request):
+    """Switch the dataset at run time and reset: {"name": "demo"} or {"name": "default"}; {"name": null} = follow
+    MOCK_DATASET again. Lets one emulator test use the demo dataset (RMA 912361, guided checklists) while the other
+    tests keep the default data."""
+    global _DATASET_OVERRIDE
+    body = await request.json()
+    name = body.get("name")
+    if name not in (None, "demo", "default"):
+        raise ApiError(400, "BAD_REQUEST", 'name must be "demo", "default" or null')
+    _DATASET_OVERRIDE = name
+    store.reset()
+    return {"ok": True, "dataset": "demo" if demo_mode() else "default"}
 
 
 @api.post("/_mock/rmas/{rma_id}/desk-edit")
