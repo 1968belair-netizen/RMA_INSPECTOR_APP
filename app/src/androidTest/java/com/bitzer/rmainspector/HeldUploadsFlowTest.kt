@@ -65,6 +65,7 @@ class HeldUploadsFlowTest {
             runBlocking { ServiceLocator.settings(context).clearWorkListFilter() }
             ServiceLocator.drafts(context).clearAll()
             ServiceLocator.uploadQueue(context).clearAll()
+            ServiceLocator.recentCodes(context).clearAll() // the picks below must not change other tests' pickers
             mock("POST", "/_mock/reset", null)
         }
     }

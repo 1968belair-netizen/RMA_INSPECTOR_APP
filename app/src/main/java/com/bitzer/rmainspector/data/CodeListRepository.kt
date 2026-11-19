@@ -193,4 +193,11 @@ class RecentCodesStore(private val file: File, private val max: Int = 8) {
         }
         Unit
     }
+
+    /** Forgets every recent code (emulator tests only: "recently used" chips change what a picker shows first). */
+    fun clearAll() = synchronized(lock) {
+        data = Data()
+        file.delete()
+        Unit
+    }
 }
