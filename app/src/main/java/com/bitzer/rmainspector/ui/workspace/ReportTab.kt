@@ -86,9 +86,6 @@ object ReportTags {
     const val VIEWER_TOGGLE = "report_viewer_toggle"
 }
 
-/** Window height of the tab body below which the on-screen keyboard is assumed open (panes then collapse). */
-private val KEYBOARD_BODY_HEIGHT = 300.dp
-
 /**
  * Report tab (spec §7). Landscape: photo viewer + filmstrip on the left, report form on the right. Portrait: the
  * viewer is a collapsible section above the form. With the on-screen keyboard open the viewer collapses so the
@@ -101,7 +98,7 @@ private val KEYBOARD_BODY_HEIGHT = 300.dp
 fun ReportTab(rows: List<FindingRow>, selection: String?, report: ReportState, readOnly: Boolean, twoPane: Boolean, cb: ReportCallbacks,
               onSelect: (String?) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().testTag(WorkspaceTags.listPane(WorkspaceTab.REPORT))) {
-        val keyboard = report.keyboardOpen ?: (WindowInsets.isImeVisible || maxHeight < KEYBOARD_BODY_HEIGHT)
+        val keyboard = report.keyboardOpen ?: WindowInsets.isImeVisible
         val bodyHeight = maxHeight
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
