@@ -65,7 +65,8 @@ class GuidedFlowTest {
             ServiceLocator.drafts(context).clearAll()
             ServiceLocator.guidedProgress(context).clearAll()
             ServiceLocator.photos(context).clearAll()
-            ServiceLocator.codeLists(context).clear()   // the demo code lists carry checklists; don't leak them
+            // The demo code lists carry checklists: drop the device copy (sign-in refreshes with force = true).
+            File(context.filesDir, "codelists/codelists.json").delete()
         }
     }
 
