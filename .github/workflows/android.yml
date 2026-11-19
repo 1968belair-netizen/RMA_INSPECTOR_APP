@@ -48,12 +48,12 @@ jobs:
         run: ./gradlew --no-daemon -PversionCode=${{ github.run_number }} assembleDebug recordRoborazziDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk "RMA-Inspector-0.1.${{ github.run_number }}-debug.apk"
+        run: cp app/build/outputs/apk/debug/app-debug.apk "BITZER-Inspect-0.1.${{ github.run_number }}-debug.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RMA-Inspector-debug-apk
-          path: RMA-Inspector-*-debug.apk
+          name: BITZER-Inspect-debug-apk
+          path: BITZER-Inspect-*-debug.apk
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
@@ -88,7 +88,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest RMA-Inspector-*-debug.apk \
+          gh release create latest BITZER-Inspect-*-debug.apk \
             --prerelease --target "$GITHUB_SHA" \
             --title "Latest build (0.1.${{ github.run_number }})" \
             --notes "Debug build of main at ${GITHUB_SHA::7}. Install on the test tablet: download the APK on the tablet and open it."
