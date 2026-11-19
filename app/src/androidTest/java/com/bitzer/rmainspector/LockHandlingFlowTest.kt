@@ -57,6 +57,7 @@ class LockHandlingFlowTest {
             mockLock(false) // never leave the lock on for other tests
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             ServiceLocator.uploadQueue(context).clearAll()
+            ServiceLocator.recentCodes(context).clearAll() // the picks above must not reorder other tests' pickers
         }
     }
 
