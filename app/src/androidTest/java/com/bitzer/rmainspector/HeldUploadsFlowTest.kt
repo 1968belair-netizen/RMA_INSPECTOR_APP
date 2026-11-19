@@ -17,6 +17,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bitzer.rmainspector.data.ServiceLocator
@@ -100,7 +102,12 @@ class HeldUploadsFlowTest {
         compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 15_000)
         openSettings()
         compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
-        compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
+        try {
+            compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
+        } catch (e: Throwable) {
+            throw AssertionError("No sign-out prompt. Queue: ${queue.snapshot().map { it.state.name + "/" + it.inspector.username }}\n" +
+                compose.onRoot().printToString(maxDepth = 12).take(3000), e)
+        }
         compose.waitUntilAtLeastOneExists(hasText("You have 1 upload waiting."), timeoutMillis = 10_000)
         compose.onNodeWithTag(QueueTags.SIGN_OUT_ANYWAY).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
