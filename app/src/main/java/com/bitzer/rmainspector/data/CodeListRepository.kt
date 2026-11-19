@@ -182,6 +182,9 @@ class RecentCodesStore(private val file: File, private val max: Int = 8) {
 
     fun get(list: String): List<CodeKey> = synchronized(lock) { load().lists[list].orEmpty() }
 
+    /** Forgets every recent code (emulator tests only, so one test's picks don't reorder another's pickers). */
+    fun clearAll() = synchronized(lock) { data = Data(); file.delete(); Unit }
+
     fun record(list: String, key: CodeKey) = synchronized(lock) {
         val d = load()
         val next = (listOf(key) + d.lists[list].orEmpty().filter { it != key }).take(max)

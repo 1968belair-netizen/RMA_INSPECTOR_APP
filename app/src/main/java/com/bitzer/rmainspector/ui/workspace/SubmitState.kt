@@ -1,5 +1,6 @@
 package com.bitzer.rmainspector.ui.workspace
 
+import com.bitzer.rmainspector.data.LockNotice
 import com.bitzer.rmainspector.data.SubmitProblem
 import com.bitzer.rmainspector.data.SubmitReview
 
@@ -29,9 +30,12 @@ data class SubmitQueued(
     val photosQueued: Int,
     /** True = the server can't be reached; false = it answered but can't save yet (e.g. Macola lock unconfirmed). */
     val offline: Boolean = true,
+    /** Set when the Macola lock (or an unconfirmed lock) is why it waits: same wording as the queue item (#66). */
+    val lock: LockNotice? = null,
 ) {
-    val headline: String get() = if (offline) QUEUED_HEADLINE else "Queued — will retry"
+    val headline: String get() = lock?.headline ?: if (offline) QUEUED_HEADLINE else "Queued — will retry"
     val detail: String get() = when {
+        lock != null -> lock.detail
         findingsSaved -> "The findings are saved. $photosQueued photo${if (photosQueued == 1) "" else "s"} will be uploaded " +
             if (offline) "when this tablet is back on the network." else "shortly."
         offline -> "Your findings and photos stay on this tablet and are sent automatically when it is back on the network."

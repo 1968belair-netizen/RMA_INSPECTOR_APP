@@ -242,10 +242,8 @@ object SubmitErrors {
             SubmitProblem("Can't reach the server", "Nothing was lost. $KEPT Submit again when this tablet is back on the network.", offline = true)
         f.code == "RMA_CHANGED" ->
             SubmitProblem("Changed elsewhere", "${f.message}\n\nNothing was saved. $KEPT Tap Refresh and review the changes before saving again.")
-        f.httpStatus == 423 || f.code == "RMA_LOCKED" ->
-            SubmitProblem("Open in Macola", "${f.message}\n\nNothing was saved. $KEPT Try again when it's closed.")
-        f.code == "LOCK_CHECK_FAILED" ->
-            SubmitProblem("Can't confirm the lock", "${f.message}\n\nNothing was saved. $KEPT")
+        LockHandling.isLockFailure(f) ->
+            LockHandling.noticeFor(f)!!.let { SubmitProblem(it.title, "${it.headline}\n\n${it.detail}") }
         f.httpStatus == 422 || f.code == "VALIDATION_FAILED" ->
             SubmitProblem("The server rejected the findings", "${f.message}\n\nNothing was saved. $KEPT Fix the item and submit again.")
         f.code == "RMA_NOT_OPEN" ->

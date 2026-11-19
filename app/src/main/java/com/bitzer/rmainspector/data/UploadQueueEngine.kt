@@ -147,7 +147,7 @@ class UploadQueueEngine(
             QueueDecision.RETRY -> store.modify(id) {
                 val n = it.attempts + 1
                 it.copy(state = QueueState.WAITING, attempts = n, reason = QueueRules.reasonFor(f), reasonCode = f.code,
-                    nextTryAt = now() + QueueRules.backoffMillis(n, locked = f.httpStatus == 423 || f.code == "RMA_LOCKED"))
+                    nextTryAt = now() + LockHandling.retryDelayMillis(f, n))
             }
             QueueDecision.HOLD -> {
                 store.modify(id) { it.copy(state = QueueState.WAITING, reason = "Sign in again to send this.", reasonCode = f.code) }
