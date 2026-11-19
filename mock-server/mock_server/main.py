@@ -371,7 +371,7 @@ def code_label(obj) -> str:
 
 # ---------------------------------------------------------------- app
 
-app = FastAPI(title="RMA Inspector mock server", version=SERVER_VERSION)
+app = FastAPI(title="BITZER Inspect mock server", version=SERVER_VERSION)
 api = APIRouter(prefix="/api/v1")
 
 

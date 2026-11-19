@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RMA_Inspector"
+rootProject.name = "BITZER_Inspect"
 include(":app")

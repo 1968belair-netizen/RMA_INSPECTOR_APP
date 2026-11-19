@@ -103,7 +103,7 @@ fun ScannerContent(
         when (state) {
             is ScannerState.NeedsPermission -> Message(
                 title = if (state.blocked) "Camera access is turned off" else "Camera access needed",
-                body = if (state.blocked) "Turn on Camera for RMA Inspector in the tablet's app settings, then come back."
+                body = if (state.blocked) "Turn on Camera for BITZER Inspect in the tablet's app settings, then come back."
                 else "The camera is only used to read a barcode, QR code or serial plate on this tablet. Pictures are never saved or sent.",
                 action = if (state.blocked) "Open app settings" else "Allow camera",
                 onAction = if (state.blocked) onOpenAppSettings else onGrantPermission,

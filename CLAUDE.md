@@ -1,6 +1,6 @@
-# CLAUDE.md — RMA Inspector App
+# CLAUDE.md — BITZER Inspect (formerly "RMA Inspector App")
 
-BITZER US RMA inspection tablet app: native Android (Kotlin / Jetpack Compose) + a Python app server that
+BITZER Inspect: BITZER US RMA inspection tablet app: native Android (Kotlin / Jetpack Compose) + a Python app server that
 reuses the RMA Tools workbench core modules. The app covers the whole inspection **and** report process.
 
 ## Read first

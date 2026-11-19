@@ -65,5 +65,8 @@ data class ReportSubmitCallbacks(
 sealed interface SubmitEvent {
     data class DraftChanged(val draft: ReportDraft) : SubmitEvent
     data object ReloadRma : SubmitEvent
+
+    /** `409 RMA_CHANGED` while saving the summary: open the conflict screen ([base] = the RMA as loaded). */
+    data class Conflict(val base: com.bitzer.rmainspector.data.RmaDetail, val current: com.bitzer.rmainspector.data.RmaDetail?) : SubmitEvent
     data object ReloadPhotos : SubmitEvent
 }

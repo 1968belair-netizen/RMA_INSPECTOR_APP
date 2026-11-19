@@ -1,4 +1,4 @@
-# Demo guide — RMA Inspector (mock server, fake data)
+# Demo guide — BITZER Inspect (mock server, fake data)
 
 A five-minute walk through the whole loop on a tablet or phone, against the **mock server**. Everything shown is
 **fake data**: RMA numbers 912361–912369, "Example Refrigeration Co.", fake serials. Nothing touches Macola or the G: drive.
@@ -9,7 +9,7 @@ A five-minute walk through the whole loop on a tablet or phone, against the **mo
 hotspot. No BITZER network is needed.
 
 1. **Install the app.** On the tablet, open the GitHub release named **latest** (APK list) and install the newest
-   `RMA-Inspector-…-debug.apk`. Allow "install unknown apps" if asked. A new APK installs over the old one.
+   `BITZER-Inspect-…-debug.apk`. Allow "install unknown apps" if asked. A new APK installs over the old one.
 2. **Start the mock server.** On the laptop, open the repo's `mock-server` folder and double-click
    **`run_mock_server.bat`**. It installs what it needs, starts the **demo dataset**, and prints the laptop's
    IPv4 address, e.g. `192.168.43.20`. Leave the window open. If Windows asks about the firewall, allow

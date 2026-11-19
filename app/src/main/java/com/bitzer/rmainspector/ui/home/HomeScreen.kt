@@ -148,7 +148,7 @@ fun HomeContent(
     Scaffold(
         topBar = {
             BitzerTopBar(
-                title = "RMA Inspector",
+                title = "BITZER Inspect",
                 actions = {
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, contentDescription = "Settings") }
                 },

@@ -24,13 +24,13 @@ For every step that does not match "Expect", take a **screenshot**, and report: 
    the old one.
 7. **Guided inspection photo.** **Start guided inspection** -> take the **Overall** photo -> **Next**. Expect: photo
    saved for that step, step counter advances; **Exit** then the button reads "Continue (step x of y)".
-8. **Permission denied (photo camera).** Android Settings -> Apps -> RMA Inspector -> Permissions -> Camera ->
+8. **Permission denied (photo camera).** Android Settings -> Apps -> BITZER Inspect -> Permissions -> Camera ->
    **Don't allow**. Reopen the app, Photos tab, take a photo. Expect: "The app needs the camera..." with **Allow
    camera**. Tap it and **Don't allow** (twice if asked). Expect: "Camera permission was denied..." and **Open app
    settings**. Tap it, turn Camera on, press Back. Expect: the camera starts by itself.
 9. **Permission denied (search camera).** Turn Camera off again and tap the search camera icon. Expect: "Camera
    access needed" -> after denying, "Camera access is turned off" with **Open app settings**; same recovery.
-10. **Camera busy.** Open the tablet's own Camera app, leave it open, switch to RMA Inspector, open a camera. Expect:
+10. **Camera busy.** Open the tablet's own Camera app, leave it open, switch to BITZER Inspect, open a camera. Expect:
     a clear message ("camera couldn't be started...") with **Try again** (search) or a red message (photo), not a
     blank screen. Close the other camera app, tap **Try again**: the picture appears.
 11. **Photo rotation and app switch.** Photo camera open: rotate, then press Home and return. Expect: camera still

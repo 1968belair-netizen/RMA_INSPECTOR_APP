@@ -196,4 +196,5 @@ class RecentCodesStore(private val file: File, private val max: Int = 8) {
         }
         Unit
     }
+
 }

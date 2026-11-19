@@ -116,7 +116,7 @@ internal fun CameraOverlay(photos: PhotosState, cb: WorkspaceCallbacks) {
 @Composable
 internal fun BoxScope.CameraPermissionPrompt(denied: Boolean, onAllow: () -> Unit, onOpenSettings: () -> Unit, onCancel: () -> Unit) {
     Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(if (denied) "Camera permission was denied. Turn on Camera for RMA Inspector in the tablet's app settings, then come back to take photos." else "The app needs the camera to take inspection photos.",
+        Text(if (denied) "Camera permission was denied. Turn on Camera for BITZER Inspect in the tablet's app settings, then come back to take photos." else "The app needs the camera to take inspection photos.",
             style = MaterialTheme.typography.bodyLarge, color = BitzerColors.White)
         if (denied) Button(onClick = onOpenSettings, modifier = Modifier.heightIn(min = 56.dp).testTag(CameraTags.SETTINGS)) { Text("Open app settings") }
         else Button(onClick = onAllow, modifier = Modifier.heightIn(min = 56.dp).testTag(CameraTags.ALLOW)) { Text("Allow camera") }

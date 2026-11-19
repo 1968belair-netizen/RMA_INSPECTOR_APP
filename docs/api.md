@@ -1,4 +1,4 @@
-# RMA Inspection App — Tablet ↔ Server API (v1 DRAFT)
+# BITZER Inspect — Tablet ↔ Server API (v1 DRAFT)
 
 _Rev 7 — 2026-11-18: **sign-in required** (username + password → token; replaces the inspector picker), **work
 list = Received only**, filtered by product type and return code (server settings, oldest first), `status_since` +
