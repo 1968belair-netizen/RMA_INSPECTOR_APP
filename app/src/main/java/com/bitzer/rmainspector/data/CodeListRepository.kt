@@ -197,10 +197,4 @@ class RecentCodesStore(private val file: File, private val max: Int = 8) {
         Unit
     }
 
-    /** Forgets every list (emulator tests only, so one test's picks don't change another test's pickers). */
-    fun clearAll() = synchronized(lock) {
-        data = Data()
-        file.delete()
-        Unit
-    }
 }
