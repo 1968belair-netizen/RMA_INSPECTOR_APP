@@ -274,8 +274,9 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
                         photos = it.photos.copy(busy = false, takenThisSession = it.photos.takenThisSession + 1, capture = if (retake || (target is CaptureTarget.Row && target.slot != null)) null else it.photos.capture),
                     )
                 }
-            }.onFailure {
-                _state.update { s2 -> s2.copy(photos = s2.photos.copy(busy = false, message = "The photo couldn't be saved. Try again.")) }
+            }.onFailure { e ->
+                val msg = if (e is com.bitzer.rmainspector.data.StorageFullException) e.message!! else "The photo couldn't be saved. Try again."
+                _state.update { s2 -> s2.copy(photos = s2.photos.copy(busy = false, message = msg)) }
             }
         }
     }

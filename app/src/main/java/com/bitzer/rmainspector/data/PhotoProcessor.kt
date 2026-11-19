@@ -13,13 +13,23 @@ import java.time.ZoneId
 /** What [PhotoProcessor.process] produced. */
 data class ProcessedPhoto(val width: Int, val height: Int, val bytes: Long, val sha256: String, val capturedAt: String)
 
+/** The tablet is (nearly) out of storage; the message is shown to the inspector as is. */
+class StorageFullException(message: String = "The tablet is almost out of storage. Free some space, then take the photo again.") : java.io.IOException(message)
+
 /**
  * Turns the camera's JPEG into the photo that is stored and later uploaded (spec §9.4): EXIF orientation applied to
  * the pixels, long edge scaled down to the server's `max_edge_px`, re-encoded at `jpeg_quality`. Re-encoding drops
  * every EXIF tag, so GPS and device data are gone; only the capture time is written back.
  */
 object PhotoProcessor {
-    fun process(source: File, dest: File, settings: PhotoSettings, now: Instant = Instant.now()): ProcessedPhoto {
+    /** Free space kept in reserve besides the photo itself (the store also writes its index). */
+    private const val MIN_FREE_BYTES = 8L * 1024 * 1024
+
+    fun process(
+        source: File, dest: File, settings: PhotoSettings, now: Instant = Instant.now(),
+        usableSpace: (File) -> Long = { it.usableSpace },
+    ): ProcessedPhoto {
+        dest.parentFile?.let { dir -> if (usableSpace(dir) < PhotoMath.requiredFreeBytes(source.length(), MIN_FREE_BYTES)) throw StorageFullException() }
         val exif = ExifInterface(source.absolutePath)
         val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         val taken = PhotoMath.capturedAt(
@@ -31,22 +41,45 @@ object PhotoProcessor {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "The photo couldn't be read." }
-        val opts = BitmapFactory.Options().apply {
-            inSampleSize = PhotoMath.sampleSize(bounds.outWidth, bounds.outHeight, settings.maxEdgePx)
+        // A big photo on a tablet with little memory can run out of heap; retry with a smaller decode (twice as coarse
+        // each time, up to 3 times). The result is still at least as large as the server's max edge when possible.
+        var sample = PhotoMath.sampleSize(bounds.outWidth, bounds.outHeight, settings.maxEdgePx)
+        var attempt = 0
+        var decoded: Bitmap? = null
+        var upright: Bitmap? = null
+        var scaled: Bitmap? = null
+        while (scaled == null) {
+            try {
+                val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                decoded = BitmapFactory.decodeFile(source.absolutePath, opts) ?: error("The photo couldn't be read.")
+                upright = applyOrientation(decoded, orientation)
+                val (w, h) = PhotoMath.targetSize(upright.width, upright.height, settings.maxEdgePx)
+                scaled = if (w != upright.width || h != upright.height) Bitmap.createScaledBitmap(upright, w, h, true) else upright
+            } catch (e: OutOfMemoryError) {
+                if (upright !== decoded) upright?.recycle()
+                decoded?.recycle(); decoded = null; upright = null
+                if (++attempt > 3) throw java.io.IOException("The photo is too large to process on this tablet.", e)
+                sample *= 2
+            }
         }
-        val decoded = BitmapFactory.decodeFile(source.absolutePath, opts) ?: error("The photo couldn't be read.")
+        val decodedBmp = decoded!!
+        val uprightBmp = upright!!
+        val scaledBmp = scaled!!
 
-        val upright = applyOrientation(decoded, orientation)
-        val (w, h) = PhotoMath.targetSize(upright.width, upright.height, settings.maxEdgePx)
-        val scaled = if (w != upright.width || h != upright.height) Bitmap.createScaledBitmap(upright, w, h, true) else upright
-
-        val outW = scaled.width
-        val outH = scaled.height
+        val outW = scaledBmp.width
+        val outH = scaledBmp.height
         val tmp = File(dest.parentFile, dest.name + ".tmp")
-        FileOutputStream(tmp).use { check(scaled.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality.coerceIn(1, 100), it)) { "Couldn't save the photo." } }
-        if (scaled !== upright) scaled.recycle()
-        if (upright !== decoded) upright.recycle()
-        decoded.recycle()
+        try {
+            FileOutputStream(tmp).use { check(scaledBmp.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality.coerceIn(1, 100), it)) { "Couldn't save the photo." } }
+        } catch (e: java.io.IOException) {
+            tmp.delete()
+            // Writing failed part-way: that is almost always a full disk.
+            throw if (usableSpace(tmp.parentFile ?: tmp) < MIN_FREE_BYTES) StorageFullException() else e
+        } finally {
+            if (scaledBmp !== uprightBmp) scaledBmp.recycle()
+            if (uprightBmp !== decodedBmp) uprightBmp.recycle()
+            decodedBmp.recycle()
+        }
 
         // Keep the capture time only (no GPS, no device tags). Best effort: the photo is fine without it.
         runCatching {

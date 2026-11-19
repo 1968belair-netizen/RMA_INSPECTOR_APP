@@ -33,4 +33,23 @@ class ScanParsingTest {
         assertEquals(emptyList<String>(), ScanParsing.candidateLines(null))
         assertEquals(emptyList<String>(), ScanParsing.candidateLines("  \n "))
     }
+
+    // Issue #68: real-world QR / label payloads.
+    @Test fun qrLinkWithRmaQuery() = assertEquals("912345", ScanParsing.fromBarcode("https://rma-server.example.invalid/view?rma=912345&x=1"))
+    @Test fun qrLinkQueryKeyIsCaseInsensitive() = assertEquals("912345", ScanParsing.fromBarcode("https://rma-server.example.invalid/view?RMA=912345"))
+    @Test fun qrLinkWithPathSegment() = assertEquals("912345", ScanParsing.fromBarcode("https://rma-server.example.invalid/rma/912345/"))
+    @Test fun qrLinkWithSerialQueryAndFragment() = assertEquals("25X0000001", ScanParsing.fromBarcode("http://example.invalid/p?sn=25X0000001#top"))
+    @Test fun qrLinkPercentEncoded() = assertEquals("25X 01", ScanParsing.fromBarcode("https://example.invalid/p?serial=25X%2001"))
+    @Test fun qrBareHostIsNull() = assertNull(ScanParsing.fromBarcode("https://rma-server.example.invalid"))
+    @Test fun qrBareHostWithSlashIsNull() = assertNull(ScanParsing.fromBarcode("https://rma-server.example.invalid/"))
+    @Test fun barcodeStripsRmaPrefix() {
+        assertEquals("912345", ScanParsing.fromBarcode("RMA 912345"))
+        assertEquals("912345", ScanParsing.fromBarcode("RMA#912345"))
+        assertEquals("912345", ScanParsing.fromBarcode("RMA No: 912345"))
+        assertEquals("912345", ScanParsing.fromBarcode("rma912345"))
+    }
+    @Test fun barcodeKeepsRmaWordWithoutNumber() = assertEquals("RMA", ScanParsing.fromBarcode("RMA"))
+    @Test fun barcodeDropsZeroWidthAndBom() = assertEquals("912345", ScanParsing.fromBarcode("\uFEFF91\u200B2345"))
+    @Test fun plateRemovesRmaLabel() = assertEquals(listOf("912345"), ScanParsing.candidateLines("RMA No: 912345"))
+    @Test fun codesStayText() = assertEquals("07", ScanParsing.fromBarcode("07"))
 }

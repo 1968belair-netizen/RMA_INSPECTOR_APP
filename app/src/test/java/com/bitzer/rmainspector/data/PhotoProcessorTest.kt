@@ -60,4 +60,44 @@ class PhotoProcessorTest {
         val r = PhotoProcessor.process(camera(100, 80, ExifInterface.ORIENTATION_NORMAL), File(tmp.root, "o.jpg"), PhotoSettings())
         assertEquals(100, r.width); assertEquals(80, r.height)
     }
+
+    // Issue #68: real-device failure paths.
+    @Test fun lowStorageIsReportedBeforeAnythingIsWritten() {
+        val dest = File(tmp.root, "full.jpg")
+        try {
+            PhotoProcessor.process(camera(100, 80, ExifInterface.ORIENTATION_NORMAL), dest, PhotoSettings(), usableSpace = { 1024L })
+            org.junit.Assert.fail("expected StorageFullException")
+        } catch (e: StorageFullException) {
+            assertTrue(e.message!!.contains("storage"))
+        }
+        assertTrue(!dest.exists())
+        assertTrue(!File(tmp.root, "full.jpg.tmp").exists())
+    }
+
+    @Test fun unreadableFileFailsCleanly() {
+        val bad = tmp.newFile().also { it.writeText("not a jpeg") }
+        try {
+            PhotoProcessor.process(bad, File(tmp.root, "x.jpg"), PhotoSettings())
+            org.junit.Assert.fail("expected failure")
+        } catch (e: AssertionError) {
+            throw e
+        } catch (e: Exception) {
+            assertTrue(!File(tmp.root, "x.jpg").exists())
+        }
+    }
+
+    @Test fun everyExifOrientationYieldsUprightSize() {
+        // 400x300 pixels: orientations 5-8 swap width/height.
+        val swapped = setOf(ExifInterface.ORIENTATION_TRANSPOSE, ExifInterface.ORIENTATION_ROTATE_90, ExifInterface.ORIENTATION_TRANSVERSE, ExifInterface.ORIENTATION_ROTATE_270)
+        for (o in 1..8) {
+            val r = PhotoProcessor.process(camera(400, 300, o), File(tmp.root, "o$o.jpg"), PhotoSettings(maxEdgePx = 4000))
+            if (o in swapped) { assertEquals("orientation $o", 300, r.width); assertEquals(400, r.height) }
+            else { assertEquals("orientation $o", 400, r.width); assertEquals(300, r.height) }
+        }
+    }
+
+    @Test fun requiredFreeBytesHasAFloor() {
+        assertEquals(8L, PhotoMath.requiredFreeBytes(1, 8))
+        assertEquals(20L, PhotoMath.requiredFreeBytes(10, 8))
+    }
 }
