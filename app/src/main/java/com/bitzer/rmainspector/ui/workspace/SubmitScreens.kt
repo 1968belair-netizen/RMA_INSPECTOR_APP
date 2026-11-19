@@ -79,7 +79,7 @@ fun SubmitOverlay(phase: InspectionSubmitPhase, cb: SubmitCallbacks) {
 }
 
 @Composable
-private fun ScreenFrame(tag: String, title: String, subtitle: String?, actions: @Composable RowScope.() -> Unit, body: @Composable () -> Unit) {
+internal fun ScreenFrame(tag: String, title: String, subtitle: String?, actions: @Composable RowScope.() -> Unit, maxWidth: androidx.compose.ui.unit.Dp = 720.dp, body: @Composable () -> Unit) {
     Surface(color = BitzerColors.White, modifier = Modifier.fillMaxSize().testTag(tag)) {
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().background(BitzerColors.Black).padding(horizontal = 24.dp, vertical = 16.dp)) {
@@ -88,7 +88,7 @@ private fun ScreenFrame(tag: String, title: String, subtitle: String?, actions: 
             }
             Box(Modifier.fillMaxWidth().height(4.dp).background(BitzerColors.Green))
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.widthIn(max = maxWidth).fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     body()
                 }
             }
@@ -100,7 +100,7 @@ private fun ScreenFrame(tag: String, title: String, subtitle: String?, actions: 
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+internal fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(title.uppercase(), style = MaterialTheme.typography.titleSmall, color = BitzerColors.DarkGreen)
         content()
@@ -108,7 +108,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Bullets(prefix: String, items: List<String>) {
+internal fun Bullets(prefix: String, items: List<String>) {
     items.forEach { Text("$prefix  $it", style = MaterialTheme.typography.bodyLarge) }
 }
 
