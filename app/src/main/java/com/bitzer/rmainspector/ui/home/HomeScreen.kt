@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -51,6 +52,7 @@ import com.bitzer.rmainspector.ui.scan.ScannerScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bitzer.rmainspector.data.Code
+import com.bitzer.rmainspector.data.earlierSessionText
 import com.bitzer.rmainspector.ui.AppUiState
 import com.bitzer.rmainspector.ui.Connection
 import com.bitzer.rmainspector.ui.components.BitzerTopBar
@@ -67,6 +69,7 @@ object HomeTags {
     const val SEARCH = "home-search"
     const val COUNT = "home-work-count"
     const val SCAN = "home-scan"
+    const val EARLIER_UPLOADS = "home-earlier-uploads"
     fun workItem(rmaId: String) = "work-item-$rmaId"
     fun searchItem(rmaId: String) = "search-item-$rmaId"
 }
@@ -79,6 +82,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onRetryServer: () -> Unit,
     onOpenRma: (rmaId: String) -> Unit,
+    onDismissEarlierUploads: () -> Unit = {},
     vm: HomeViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -104,6 +108,7 @@ fun HomeScreen(
         onOpenSettings = onOpenSettings,
         onRetryServer = onRetryServer,
         onOpenRma = onOpenRma,
+        onDismissEarlierUploads = onDismissEarlierUploads,
     )
 
     // Camera search (spec §3.1): the scanned text fills the box and runs the search. Only text leaves the scanner.
@@ -135,6 +140,7 @@ fun HomeContent(
     onOpenRma: (rmaId: String) -> Unit,
     today: LocalDate = LocalDate.now(),
     onScan: () -> Unit = {},
+    onDismissEarlierUploads: () -> Unit = {},
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val runSearch = { keyboard?.hide(); onSearch() }
@@ -163,6 +169,17 @@ fun HomeContent(
                                     Row {
                                         TextButton(onClick = onRetryServer) { Text("Retry") }
                                         TextButton(onClick = onOpenSettings) { Text("Settings") }
+                                    }
+                                }
+                            }
+                        }
+                        if (app.earlierUploads > 0) {
+                            InfoBanner(Icons.Filled.CloudUpload, earlierSessionText(app.earlierUploads), BitzerColors.Green,
+                                Modifier.testTag(HomeTags.EARLIER_UPLOADS)) {
+                                Row {
+                                    TextButton(onClick = onOpenSettings, modifier = Modifier.heightIn(min = 56.dp)) { Text("Upload queue") }
+                                    IconButton(onClick = onDismissEarlierUploads, modifier = Modifier.size(56.dp)) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Hide")
                                     }
                                 }
                             }

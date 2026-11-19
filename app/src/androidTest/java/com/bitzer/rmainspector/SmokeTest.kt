@@ -57,6 +57,7 @@ class SmokeTest {
             ServiceLocator.auth(context).clear()
             runBlocking { ServiceLocator.settings(context).clearWorkListFilter() } // server-default chips
             ServiceLocator.drafts(context).clearAll() // no drafts left over from another test
+            ServiceLocator.uploadQueue(context).clearAll() // no waiting uploads: Sign out must not ask about them
         }
     }
 

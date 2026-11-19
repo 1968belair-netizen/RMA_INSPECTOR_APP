@@ -339,6 +339,17 @@ def test_work_list_blank_product_type_token(client):
     assert client.get("/api/v1/rmas", params={"product_type": ""}).json()["results"] == []
 
 
+def test_mock_lock_check_toggle_and_state(client, H):
+    """Test hooks for the held-upload emulator test: a failing lock check (503, queued by the tablet), then working again."""
+    assert client.get("/api/v1/_mock/rmas/912356/state").json()["status"] == "Received"
+    client.post("/api/v1/_mock/rmas/912356/lock-check", json={"fails": True})
+    assert client.get("/api/v1/_mock/rmas/912356/state").json()["lock_check_fails"] is True
+    r = client.post("/api/v1/rmas/912356/inspection", headers=H, json={"submission_id": sid()})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "LOCK_CHECK_FAILED"
+    client.post("/api/v1/_mock/rmas/912356/lock-check", json={"fails": False})
+    assert client.get("/api/v1/_mock/rmas/912356/state").json()["lock_check_fails"] is False
+
+
 def test_codelists_status_roles_default_and_override(client, monkeypatch):
     roles = client.get("/api/v1/codelists").json()["status_roles"]
     assert roles == {"inspected": "Inspected", "report_complete": "Report Complete",

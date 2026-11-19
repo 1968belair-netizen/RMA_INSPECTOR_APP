@@ -77,22 +77,29 @@ object ServiceLocator {
             queueStore ?: UploadQueueStore(File(context.applicationContext.filesDir, "queue/queue.json")).also { queueStore = it }
         }
 
-    /** Sends the queue in the background while the app runs; call [UploadQueueRunner.kick] after a sign-in. */
-    fun uploadQueueRunner(context: Context): UploadQueueRunner =
-        queueRunner ?: synchronized(this) {
-            queueRunner ?: run {
+    @Volatile private var queueEngine: UploadQueueEngine? = null
+
+    /** The one engine that sends the queue (the background runner and Send now both use it, so they never overlap). */
+    fun uploadQueueEngine(context: Context): UploadQueueEngine =
+        queueEngine ?: synchronized(this) {
+            queueEngine ?: run {
                 val app = context.applicationContext
                 val auth = auth(app)
                 val settings = settings(app)
-                val engine = UploadQueueEngine(
+                UploadQueueEngine(
                     store = uploadQueue(app),
                     gateway = ApiQueueGateway(api) { settings.settings.first().serverUrl },
                     photos = photos(app), drafts = drafts(app), reportDrafts = reportDrafts(app),
                     currentSession = { auth.session.value },
                     onUnauthorized = { auth.expire(it) },
-                )
-                UploadQueueRunner(engine).also { queueRunner = it }
+                ).also { queueEngine = it }
             }
+        }
+
+    /** Sends the queue in the background while the app runs; call [UploadQueueRunner.kick] after a sign-in. */
+    fun uploadQueueRunner(context: Context): UploadQueueRunner =
+        queueRunner ?: synchronized(this) {
+            queueRunner ?: UploadQueueRunner(uploadQueueEngine(context)).also { queueRunner = it }
         }
 
     fun settings(context: Context): SettingsStore =

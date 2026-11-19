@@ -88,6 +88,7 @@ fun RmaInspectorApp(vm: AppViewModel = viewModel()) {
                 app = state,
                 onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                 onRetryServer = vm::refresh,
+                onDismissEarlierUploads = vm::dismissEarlierUploads,
                 onOpenRma = { id -> nav.navigate(Routes.rma(id)) },
             )
         }
@@ -104,7 +105,12 @@ fun RmaInspectorApp(vm: AppViewModel = viewModel()) {
                 onSaveServer = vm::saveServerUrl,
                 onResetServer = vm::resetServerUrl,
                 onTest = vm::refresh,
-                onSignOut = vm::signOut,
+                onSignOut = vm::requestSignOut,
+                onSendBeforeSignOut = vm::sendBeforeSignOut,
+                onSignOutAnyway = vm::signOutAnyway,
+                onDismissSignOutPrompt = vm::dismissSignOutPrompt,
+                onRetryQueueItem = vm::retryQueueItem,
+                onCancelQueueItem = vm::cancelQueueItem,
             )
         }
     }
