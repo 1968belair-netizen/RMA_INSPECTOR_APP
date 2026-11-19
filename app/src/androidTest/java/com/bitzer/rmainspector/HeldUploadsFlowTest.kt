@@ -105,14 +105,15 @@ class HeldUploadsFlowTest {
         compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo()
             .performSemanticsAction(SemanticsActions.OnClick)
         try {
-            compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
+            // The modal draws the title in capitals, and its container tag is not reliably in the merged tree: match the text.
+            compose.waitUntilAtLeastOneExists(hasText("You have 1 upload waiting.", ignoreCase = true), timeoutMillis = 10_000)
         } catch (e: Throwable) {
             throw AssertionError("No sign-out prompt. Queue: ${queue.snapshot().map { it.state.name + "/" + it.inspector.username }}\n" +
                 compose.onRoot().printToString(maxDepth = 20).lines()
                     .filter { it.contains("Text =") || it.contains("TestTag") }.joinToString(" | ") { it.trim().take(90) }.takeLast(2500), e)
         }
-        compose.waitUntilAtLeastOneExists(hasText("You have 1 upload waiting."), timeoutMillis = 10_000)
-        compose.onNodeWithTag(QueueTags.SIGN_OUT_ANYWAY).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasText("Send now", substring = true, ignoreCase = true) and hasClickAction(), timeoutMillis = 10_000)
+        compose.onNode(hasText("Sign out anyway") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
         assertEquals(1, queue.snapshot().size)
 
