@@ -110,6 +110,35 @@ class ReportSubmitTest {
         assertEquals("This report was already sent. Updating will regenerate it; you may need to resend it.", ReportSubmitRules.SENT_WARNING)
     }
 
+    @Test fun serverStatusRolesOverrideTheDefaults() {
+        val roles = StatusRoles(inspected = "Done", reportComplete = "Built", reportSent = listOf("Mailed"))
+        assertEquals(StatusWarning.ALREADY_COMPLETE, ReportSubmitRules.warningFor("Built", roles))
+        assertEquals(StatusWarning.ALREADY_SENT, ReportSubmitRules.warningFor("Mailed", roles))
+        // The defaults no longer apply once the server names its own statuses.
+        assertEquals(StatusWarning.NONE, ReportSubmitRules.warningFor("Report Complete", roles))
+        assertEquals(StatusWarning.NONE, ReportSubmitRules.warningFor("Sent to RSM", roles))
+        assertEquals("The report was already built. Updating will regenerate it; the status stays Built.",
+            ReportSubmitRules.completeNote("Built"))
+    }
+
+    @Test fun missingOrBlankRolesFallBackToTheDefaults() {
+        // No code lists on the device, or an older server without status_roles.
+        assertEquals(StatusWarning.ALREADY_COMPLETE, ReportSubmitRules.warningFor("Report Complete", null))
+        assertEquals(StatusWarning.ALREADY_SENT, ReportSubmitRules.warningFor("Issued to Customer", null))
+        assertEquals(StatusWarning.ALREADY_SENT, ReportSubmitRules.warningFor("Sent to RSM", CodeLists().statusRoles))
+        // Blank entries fall back one by one; the other roles keep the server's value.
+        val partial = StatusRoles(inspected = " ", reportComplete = "", reportSent = listOf("", "Mailed"))
+        val r = ReportSubmitRules.resolveRoles(partial)
+        assertEquals("Inspected", r.inspected)
+        assertEquals("Report Complete", r.reportComplete)
+        assertEquals(listOf("Mailed"), r.reportSent)
+        assertEquals(listOf("Sent to RSM", "Issued to Customer"),
+            ReportSubmitRules.resolveRoles(StatusRoles(reportSent = listOf(" "))).reportSent)
+        // status_roles absent from the JSON body.
+        val lists = ApiClient.defaultJson.decodeFromString(CodeLists.serializer(), """{"version":"1"}""")
+        assertEquals(StatusWarning.ALREADY_SENT, ReportSubmitRules.warningFor("Sent to RSM", lists.statusRoles))
+    }
+
     // --- error mapping
     private fun failure(code: String?, status: Int, message: String = "Server says no.", kind: ApiResult.Kind = ApiResult.Kind.SERVER_ERROR,
                         details: kotlinx.serialization.json.JsonObject? = null, retryable: Boolean = false) =

@@ -348,3 +348,16 @@ def test_mock_lock_check_toggle_and_state(client, H):
     assert r.status_code == 503 and r.json()["error"]["code"] == "LOCK_CHECK_FAILED"
     client.post("/api/v1/_mock/rmas/912356/lock-check", json={"fails": False})
     assert client.get("/api/v1/_mock/rmas/912356/state").json()["lock_check_fails"] is False
+
+
+def test_codelists_status_roles_default_and_override(client, monkeypatch):
+    roles = client.get("/api/v1/codelists").json()["status_roles"]
+    assert roles == {"inspected": "Inspected", "report_complete": "Report Complete",
+                     "report_sent": ["Sent to RSM", "Issued to Customer"]}
+    monkeypatch.setenv("MOCK_STATUS_ROLES", '{"report_complete": "Built", "report_sent": ["Mailed"]}')
+    r = client.get("/api/v1/codelists")
+    assert r.json()["status_roles"] == {"inspected": "Inspected", "report_complete": "Built", "report_sent": ["Mailed"]}
+    # The ETag follows the content, so the tablet picks up the rename on its next refresh.
+    assert client.get("/api/v1/codelists", headers={"If-None-Match": r.headers["ETag"]}).status_code == 304
+    monkeypatch.delenv("MOCK_STATUS_ROLES")
+    assert client.get("/api/v1/codelists", headers={"If-None-Match": r.headers["ETag"]}).status_code == 200

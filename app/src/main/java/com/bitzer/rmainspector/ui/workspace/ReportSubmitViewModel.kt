@@ -45,6 +45,7 @@ class ReportSubmitViewModel(app: Application, saved: SavedStateHandle) : Android
     val rmaId: String = checkNotNull(saved.get<String>(WorkspaceViewModel.ARG_RMA_ID))
     private val api = ServiceLocator.api
     private val settings = ServiceLocator.settings(app)
+    private val codeLists = ServiceLocator.codeLists(app)
 
     private val _state = MutableStateFlow(ReportSubmitState())
     val state: StateFlow<ReportSubmitState> = _state.asStateFlow()
@@ -83,9 +84,12 @@ class ReportSubmitViewModel(app: Application, saved: SavedStateHandle) : Android
                 "This RMA has findings that aren't submitted yet. Submit the inspection first, then the report. Your work is kept on the tablet.", false), SubmitStep.PICS)
             current.captionProblems().isNotEmpty() -> fail(SubmitError(SubmitErrorKind.VALIDATION, "Fix the photo captions",
                 "Some report photo captions are empty, too long or the same. Fix the captions marked in red under Arrange, then submit again.", false), SubmitStep.PICS)
-            else -> when (val w = ReportSubmitRules.warningFor(detail.header.inspectionStatus?.code)) {
-                StatusWarning.NONE -> runFrom(SubmitStep.PICS)
-                else -> _state.update { it.copy(phase = SubmitPhase.Confirm(w)) }
+            else -> {
+                val roles = ReportSubmitRules.resolveRoles(codeLists.state.value.lists?.statusRoles)
+                when (val w = ReportSubmitRules.warningFor(detail.header.inspectionStatus?.code, roles)) {
+                    StatusWarning.NONE -> runFrom(SubmitStep.PICS)
+                    else -> _state.update { it.copy(phase = SubmitPhase.Confirm(w, roles.reportComplete)) }
+                }
             }
         }
     }
