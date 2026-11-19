@@ -164,7 +164,7 @@ jobs:
           disk-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew --no-daemon connectedDebugAndroidTest
+          script: ./gradlew --no-daemon connectedDebugAndroidTest || (adb logcat -d -s AndroidRuntime:E TestRunner:E | tail -n 120; exit 1)
 
       - name: Show mock server log on failure
         if: failure()
