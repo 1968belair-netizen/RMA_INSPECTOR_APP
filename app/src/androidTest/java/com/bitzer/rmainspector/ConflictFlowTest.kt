@@ -46,7 +46,13 @@ class ConflictFlowTest {
             ServiceLocator.drafts(context).clearAll()
             ServiceLocator.reportDrafts(context).clear("912358")
             ServiceLocator.uploadQueue(context).clearAll()
+            ServiceLocator.recentCodes(context).clearAll()
             mockPost("/_mock/reset", "")
+        }
+
+        // Picking codes records "recently used" chips; leave none behind for the next test's pickers.
+        override fun after() {
+            ServiceLocator.recentCodes(InstrumentationRegistry.getInstrumentation().targetContext).clearAll()
         }
     }
 
