@@ -10,12 +10,16 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bitzer.rmainspector.data.ServiceLocator
@@ -66,8 +70,17 @@ class ReportLayoutFlowTest {
         compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
         compose.onNodeWithTag(WorkspaceTags.tab(WorkspaceTab.REPORT)).performClick()
 
+        // Make sure the soft keyboard from the search field is gone (an open keyboard collapses the viewer by design).
+        compose.runOnUiThread {
+            val w = compose.activity.window
+            WindowCompat.getInsetsController(w, w.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
         // Viewer with all 3 photos.
-        compose.waitUntilAtLeastOneExists(hasText("1 / 3"), timeoutMillis = 30_000)
+        try {
+            compose.waitUntilAtLeastOneExists(hasText("1 / 3"), timeoutMillis = 30_000)
+        } catch (e: Throwable) {
+            throw AssertionError("viewer counter missing; tree: " + compose.onRoot().printToString(maxDepth = 12).take(6000), e)
+        }
         compose.waitUntilAtLeastOneExists(hasTestTag(ReportTags.SUMMARY), timeoutMillis = 15_000)
 
         // Swipe to the next photo.
