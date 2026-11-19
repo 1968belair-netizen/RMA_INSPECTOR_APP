@@ -145,7 +145,7 @@ fun ReportHeaderContent(state: ReportHeaderState, callbacks: ReportHeaderCallbac
 
                 val rmaText = "RMA ${state.rmaNumber}"
                 val rmaPx = textPx(rmaText, rmaStyle)
-                val statusText = state.status.ifBlank { "—" }.uppercase()
+                val statusText = state.status.ifBlank { "—" }
                 val statusPx = textPx(statusText, statusStyle) + 2 * px(CHIP_PAD)
                 val detailsPx = textPx("DETAILS", detailsStyle) + px(4.dp) + px(24.dp) + 2 * px(CONTROL_PAD)
                 val moreText = "+${HeaderField.DISPLAY_ORDER.size}"
