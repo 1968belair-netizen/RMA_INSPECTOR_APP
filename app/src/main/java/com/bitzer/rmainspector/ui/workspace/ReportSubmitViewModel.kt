@@ -249,7 +249,7 @@ class ReportSubmitViewModel(app: Application, saved: SavedStateHandle) : Android
             return
         }
         val file = withContext(Dispatchers.IO) {
-            File(getApplication<Application>().cacheDir, "report_preview/$rmaId.pdf").also {
+            File(getApplication<Application>().cacheDir, "report_preview/$rmaId-${System.nanoTime()}.pdf").also {
                 it.parentFile?.mkdirs()
                 it.writeBytes(bytes)
             }
