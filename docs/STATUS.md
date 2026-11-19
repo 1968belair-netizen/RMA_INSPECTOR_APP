@@ -1,35 +1,31 @@
-# Status — 2026-11-18 16:10 ET (coordinator session 2)
+# Status — 2026-11-19 07:10 ET (coordinator session 3)
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
-## 1. Milestones and open work — DEMO PRIORITY
-**Goal:** full loop against the mock server for a manager demo (see decisions.md "Demo plan"). No in-app demo mode.
-Offline-queue edge cases, conflict screens and lock handling beyond the banner wait until after the demo.
-**Milestones:** A done · B/C demo path done · **E Demo** in progress. Post "DEMO READY" + APK link + `docs/demo.md` when done.
+## 1. Milestones and open work
+**Merged this session (2026-11-18/19):** #63 emulator test for guided inspection (closes #56, #20) · #69 camera hardening +
+`docs/real-tablet-test.md` (#68) · #70 upload queue core (#64) · #74 fix for a native crash when Done closed the PDF preview
+mid-render (the intermittent `ReportSubmitFlowTest.secondSubmit…` "Process crashed") · #73 lock handling that fails closed (#66).
 
 ### Open PRs
-None. **DEMO READY** posted 2026-11-18 ~16:35 ET: APK `RMA-Inspector-0.1.101-debug.apk` (release `latest`, built from 8072f8c, includes guided inspection); guide: `docs/demo.md`.
-
-**Merged this session:** #39 B1 · #37 A6 · #43 D1 camera search (needs a real-tablet test) · #42 · #47 · #50 docs · #49 M1 mock PDF · #48 M2 demo dataset · #40 C1 Report tab · #44 B2 Photos · #55 C2 Submit report · #57 C2 emulator acceptance checks · #54 B3 Submit inspection · **#53 D2 Guided inspection (8072f8c, merged without emulator test; revert if it causes problems)** · #58, #59 docs.
-**Emulator tests on main:** A6 + B1 ✅ (2026-11-18 14:12 ET). #54 and #57 emulator ✅ (one `SmokeTest` flake, passed on re-run).
+| PR | Issue | State |
+|---|---|---|
+| #72 | #65 B4b conflict screen (409 RMA_CHANGED / REPORT_PICS_CHANGED) | emulator job failed; thread fixing |
+| #71 | #67 B4d queue UI, sign-out prompt, earlier-session banner | emulator job failed; thread fixing |
 
 ### Open issues
 | Issue | Milestone | State |
 |---|---|---|
-| #20 D2 Guided inspection | D | PR #53 open; stays open until the emulator test lands (#56) |
-| #56 D2b emulator test, guided inspection with demo dataset | E Demo | after the demo |
-| #9 B4 Queue, conflicts, lock/retry | B | **deferred until after the demo** (B3 shows dialogs only for 409/423/offline) |
+| #9 B4 Queue, conflicts, lock/retry | B | split into #64 ✅ #65 (PR #72) #66 ✅ #67 (PR #71); close when #65 and #67 merge |
 | #34 Idea: pre-filled checklist | D | idea — do not implement |
-| #21 S1 Real server, read-only | server | local on Jacob's laptop; acceptance includes `(blank)` in `work_list_product_types` defaults |
-| #22 S2 Real server, write side | server | later, local |
-
-Done: #7 B2, #8 B3, #10 C1, #11 C2, #45 M1, #46 M2.
+| #21 S1 Real server, read-only | server | local on Jacob's laptop — not for cloud sessions |
+| #22 S2 Real server, write side | server | local, later |
 
 ## 2. Next steps
-1. Demo on the tablet; note anything that breaks.
-2. After the demo: #56 (guided emulator test), #9 B4 queue/conflicts, server issues #21/#22.
-3. Known gaps: camera features (D1, B2) never run on a real tablet; B3 emulator test covers Received → Inspected only
-   (912358 rebuild / 912359 resend warning are screenshot-tested only).
+1. Merge #72 and #71 when green; close #9.
+2. Jacob runs `docs/real-tablet-test.md` on a real tablet and phone; each finding becomes an issue.
+3. Known gaps: camera paths still never run on real hardware; B3 emulator test covers Received → Inspected only (912358 rebuild /
+   912359 resend warning screenshot-tested only); the open workspace is not refreshed when a background queue send finishes.
 
 ## 3. Rapid-mode rules in force (CLAUDE.md → Workflow → Rapid development mode)
 1. Keep **3 issues in progress at all times**. Start independent work now (C against the mock); only truly
