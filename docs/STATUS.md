@@ -1,31 +1,33 @@
-# Status — 2026-11-19 07:10 ET (coordinator session 3)
+# Status — 2026-11-19 09:55 ET (coordinator session 3)
 
 Read this first when resuming, then each in-progress issue's latest comment ("where I left off").
 
 ## 1. Milestones and open work
-**Merged this session (2026-11-18/19):** #63 emulator test for guided inspection (closes #56, #20) · #69 camera hardening +
-`docs/real-tablet-test.md` (#68) · #70 upload queue core (#64) · #74 fix for a native crash when Done closed the PDF preview
-mid-render (the intermittent `ReportSubmitFlowTest.secondSubmit…` "Process crashed") · #73 lock handling that fails closed (#66).
+**Merged 2026-11-18/19:** #63 guided-inspection emulator test (closes #56, #20) · #69 camera hardening + `docs/real-tablet-test.md` ·
+#70 upload queue core · #74 PDF-preview crash fix · #73 lock handling (fails closed) · #72 conflict screen (409s) · #71 queue UI,
+sign-out prompt, earlier-session banner (closes #67, #9) · #76 rename to **BITZER Inspect** + new icon · #80 status names from the
+server's `status_roles` (closes #77) · #75/#79 docs. Latest APK: `BITZER-Inspect-0.1.149-debug.apk` (release `latest`).
 
-### Open PRs
-| PR | Issue | State |
+### New feature in progress: Report tab compact header + photo viewer (Jacob, 2026-11-19; project doc `Report_Tab_Photo_Viewer_Plan_2026-11-19`)
+| Issue | What | State |
 |---|---|---|
-| #72 | #65 B4b conflict screen (409 RMA_CHANGED / REPORT_PICS_CHANGED) | emulator job failed; thread fixing |
-| #71 | #67 B4d queue UI, sign-out prompt, earlier-session banner | emulator job failed; thread fixing |
+| #81 C4a | one-line header, Details, "+n" overflow | thread building |
+| #82 C4b | photo viewer: swipe, filmstrip, caption chips, All/Report toggle, zoom | thread building |
+| #83 C4c | side-by-side / stacked layout, emulator test, spec §7 update | starts when #81 and #82 are merged; Jacob wants this in a debug release ASAP |
 
-### Open issues
+### Open issues (other)
 | Issue | Milestone | State |
 |---|---|---|
-| #9 B4 Queue, conflicts, lock/retry | B | split into #64 ✅ #65 (PR #72) #66 ✅ #67 (PR #71); close when #65 and #67 merge |
+| #78 D4 rename applicationId / package / repo | D | deferred |
 | #34 Idea: pre-filled checklist | D | idea — do not implement |
 | #21 S1 Real server, read-only | server | local on Jacob's laptop — not for cloud sessions |
 | #22 S2 Real server, write side | server | local, later |
 
 ## 2. Next steps
-1. Merge #72 and #71 when green; close #9.
-2. Jacob runs `docs/real-tablet-test.md` on a real tablet and phone; each finding becomes an issue.
-3. Known gaps: camera paths still never run on real hardware; B3 emulator test covers Received → Inspected only (912358 rebuild /
-   912359 resend warning screenshot-tested only); the open workspace is not refreshed when a background queue send finishes.
+1. Merge #81, #82, then build and merge #83; send Jacob the APK link.
+2. Jacob runs `docs/real-tablet-test.md` on the tablet and phone; each finding becomes an issue.
+3. Known gaps: camera paths never run on real hardware; the open workspace is not refreshed when a background queue send finishes;
+   the `SubmitModal` container test tag does not match in the emulator tree (match by text or button tags in tests).
 
 ## 3. Rapid-mode rules in force (CLAUDE.md → Workflow → Rapid development mode)
 1. Keep **3 issues in progress at all times**. Start independent work now (C against the mock); only truly
@@ -53,7 +55,5 @@ Known CI/session quirks:
   - Press shiftable buttons with `performSemanticsAction(SemanticsActions.OnClick)`.
   - Each test starts signed out.
 
-## 4. Open items in `docs/questions.md` (recommended option already built; Jacob may override)
-Q3, Q4 and Q6 were **approved as built on 2026-11-18** and moved to `docs/decisions.md`. Q5 was answered ("(blank)"
-chip, on by default) and its row was removed by #37. Questions #7–10 came with B1 (#39); more may arrive with
-#40 (C1) — check the file on main.
+## 4. Open questions
+None — #1–43 are in `docs/decisions.md` (#26 changed: status names come from the server). New rows arrive with the report-viewer PRs.
