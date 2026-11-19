@@ -97,7 +97,7 @@ data class SubmitReview(
 
         fun build(input: SubmitInput): SubmitReview {
             val codes = input.codes
-            val plan = StatusPlan.decide(input.rma.header.inspectionStatus, codes?.statusRoles ?: StatusRoles(),
+            val plan = StatusPlan.decide(input.rma.header.inspectionStatus, ReportSubmitRules.resolveRoles(codes?.statusRoles),
                 codes?.inspectionStatuses.orEmpty())
             val baseRows = input.base.parts.toFindingRows()
             val baseById = baseRows.associateBy { it.rowId }

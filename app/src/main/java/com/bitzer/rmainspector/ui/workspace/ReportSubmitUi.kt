@@ -69,7 +69,7 @@ fun ReportSubmitOverlay(state: ReportSubmitState, cb: ReportSubmitCallbacks) {
             modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(16.dp),
         ) {
             when (phase) {
-                is SubmitPhase.Confirm -> ConfirmCard(phase.warning, cb)
+                is SubmitPhase.Confirm -> ConfirmCard(phase.warning, phase.completeStatus, cb)
                 is SubmitPhase.Working -> WorkingCard(phase.step)
                 is SubmitPhase.SpellReview -> SpellCard(phase, cb)
                 is SubmitPhase.Error -> ErrorCard(phase.error, cb)
@@ -83,11 +83,11 @@ fun ReportSubmitOverlay(state: ReportSubmitState, cb: ReportSubmitCallbacks) {
 private fun CardTitle(text: String) = Text(text.uppercase(), style = MaterialTheme.typography.titleLarge, color = BitzerColors.DarkGreen)
 
 @Composable
-private fun ConfirmCard(w: StatusWarning, cb: ReportSubmitCallbacks) {
+private fun ConfirmCard(w: StatusWarning, completeStatus: String, cb: ReportSubmitCallbacks) {
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         CardTitle(if (w == StatusWarning.ALREADY_SENT) "Report already sent" else "Report already complete")
         Text(
-            if (w == StatusWarning.ALREADY_SENT) ReportSubmitRules.SENT_WARNING else ReportSubmitRules.COMPLETE_NOTE,
+            if (w == StatusWarning.ALREADY_SENT) ReportSubmitRules.SENT_WARNING else ReportSubmitRules.completeNote(completeStatus),
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.testTag(ReportSubmitTags.CONFIRM),
         )

@@ -433,6 +433,25 @@ def me(request: Request):
 
 
 
+DEFAULT_STATUS_ROLES = {"inspected": "Inspected", "report_complete": "Report Complete",
+                        "report_sent": ["Sent to RSM", "Issued to Customer"]}
+
+
+def status_roles() -> dict:
+    """`status_roles` of /codelists. MOCK_STATUS_ROLES (JSON, FAKE names) overrides single roles, so a renamed
+    status can be tried against the app; anything missing keeps the default."""
+    roles = {**DEFAULT_STATUS_ROLES, "report_sent": list(DEFAULT_STATUS_ROLES["report_sent"])}
+    raw = os.environ.get("MOCK_STATUS_ROLES")
+    if raw:
+        try:
+            extra = json.loads(raw)
+        except ValueError:
+            extra = {}
+        if isinstance(extra, dict):
+            roles.update({k: v for k, v in extra.items() if k in roles})
+    return roles
+
+
 def _codelists() -> dict:
     issues = [{**c, **({"pin_first": True} if c["code"] == "50" else {})} for c in CODES["issues"]]
     return {
@@ -452,8 +471,7 @@ def _codelists() -> dict:
         "work_list_statuses": [{"group": None, "code": s} for s in fd.WORK_LIST_STATUSES],
         "work_list_product_types": wl_product_types(),
         "work_list_return_codes": [{"group": None, "code": c} for c in fd.WORK_LIST_RETURN_CODES],
-        "status_roles": {"inspected": "Inspected", "report_complete": "Report Complete",
-                         "report_sent": ["Sent to RSM", "Issued to Customer"]},
+        "status_roles": status_roles(),
         "normal_issue_codes": [{"group": None, "code": "50"}],
         "checklists": fd.demo_checklists() if demo_mode() else {},
         "photo": {"max_edge_px": 2048, "jpeg_quality": 85},

@@ -98,18 +98,40 @@ fun ReportDraft.toSummaryWrite() = SummaryWrite(
 enum class StatusWarning { NONE, ALREADY_COMPLETE, ALREADY_SENT }
 
 object ReportSubmitRules {
-    const val REPORT_COMPLETE = "Report Complete"
-    val REPORT_SENT = setOf("Sent to RSM", "Issued to Customer")
+    /** Fallback names, used only when the server sends no (or blank) `status_roles`. */
+    const val DEFAULT_REPORT_COMPLETE = "Report Complete"
+    val DEFAULT_REPORT_SENT = listOf("Sent to RSM", "Issued to Customer")
 
     const val SENT_WARNING = "This report was already sent. Updating will regenerate it; you may need to resend it."
     const val COMPLETE_NOTE = "The report was already built. Updating will regenerate it; the status stays Report Complete."
 
+    /** The "already complete" text with the server's name for the Report Complete status. */
+    fun completeNote(completeStatus: String): String =
+        "The report was already built. Updating will regenerate it; the status stays $completeStatus."
+
+    /**
+     * Roles to use: a blank or missing role falls back to the default name (decision 2026-11-19, question 26).
+     * [roles] = `status_roles` of the code lists, or null when no code lists are on the device.
+     */
+    fun resolveRoles(roles: StatusRoles?): StatusRoles {
+        if (roles == null) return StatusRoles()
+        val sent = roles.reportSent.map { it.trim() }.filter { it.isNotEmpty() }
+        return StatusRoles(
+            inspected = roles.inspected.trim().ifEmpty { StatusRoles().inspected },
+            reportComplete = roles.reportComplete.trim().ifEmpty { DEFAULT_REPORT_COMPLETE },
+            reportSent = sent.ifEmpty { DEFAULT_REPORT_SENT },
+        )
+    }
+
     /** Dialog to show before the flow starts, from the RMA's current inspection status code. */
-    fun warningFor(statusCode: String?): StatusWarning = when {
-        statusCode == null -> StatusWarning.NONE
-        statusCode in REPORT_SENT -> StatusWarning.ALREADY_SENT
-        statusCode == REPORT_COMPLETE -> StatusWarning.ALREADY_COMPLETE
-        else -> StatusWarning.NONE
+    fun warningFor(statusCode: String?, roles: StatusRoles? = null): StatusWarning {
+        val r = resolveRoles(roles)
+        return when {
+            statusCode == null -> StatusWarning.NONE
+            statusCode in r.reportSent -> StatusWarning.ALREADY_SENT
+            statusCode == r.reportComplete -> StatusWarning.ALREADY_COMPLETE
+            else -> StatusWarning.NONE
+        }
     }
 
     /** Does the draft differ from the summary on the server (so it must be saved before the build)? */
