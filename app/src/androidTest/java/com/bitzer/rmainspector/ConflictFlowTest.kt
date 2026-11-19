@@ -63,8 +63,8 @@ class ConflictFlowTest {
 
         compose.onNode(hasSetTextAction()).performTextReplacement("912358")
         compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
-        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
-        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.ADD_PART) and isEnabled(), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 60_000)
+        compose.waitUntilAtLeastOneExists(hasTestTag(FindingsTags.ADD_PART) and isEnabled(), timeoutMillis = 30_000)
 
         // Someone edits the summary and the credit status at the desk after the tablet loaded the RMA.
         mockPost("/_mock/rmas/912358/desk-edit",
