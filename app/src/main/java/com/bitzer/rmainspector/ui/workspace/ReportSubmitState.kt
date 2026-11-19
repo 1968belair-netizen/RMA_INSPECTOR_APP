@@ -38,7 +38,11 @@ data class PdfPreviewState(
 sealed interface SubmitPhase {
     data object Idle : SubmitPhase
     /** Report already complete / sent: ask before regenerating. */
-    data class Confirm(val warning: StatusWarning) : SubmitPhase
+    data class Confirm(
+        val warning: StatusWarning,
+        /** Server name of the Report Complete status, for the dialog text. */
+        val completeStatus: String = com.bitzer.rmainspector.data.ReportSubmitRules.DEFAULT_REPORT_COMPLETE,
+    ) : SubmitPhase
     data class Working(val step: SubmitStep) : SubmitPhase
     data class SpellReview(val items: List<SpellItem>, val busy: Boolean = false) : SubmitPhase
     data class Preview(val preview: PdfPreviewState) : SubmitPhase

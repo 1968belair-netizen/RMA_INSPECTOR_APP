@@ -234,6 +234,9 @@ Notes:
   Received RMAs with no product type never drop off the work list.
 - `status_roles` tells the app which statuses mean "inspected", "report complete" and "report already sent", for
   the submit and report dialogs (spec §6). Order of `inspection_statuses` = workflow order.
+  The app takes the "already complete / already sent" dialog statuses from it; if it is missing or a role is blank,
+  the app falls back to `Report Complete`, `Sent to RSM`, `Issued to Customer` (decision 2026-11-19). The mock can
+  rename them with the `MOCK_STATUS_ROLES` env JSON.
 - `normal_issue_codes`: the issue code(s) meaning "normal" (Macola: `50`). Guided steps default to it; checklist
   photo rules use it.
 - **`checklists`** (empty in v1): guided inspection lists keyed by `product_type_key`. Shape:

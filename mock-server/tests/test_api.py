@@ -337,3 +337,16 @@ def test_work_list_blank_product_type_token(client):
     assert [r["rma_id"] for r in rows] == ["912351"]
     # Blank still is not matched by an empty parameter (empty = nothing).
     assert client.get("/api/v1/rmas", params={"product_type": ""}).json()["results"] == []
+
+
+def test_codelists_status_roles_default_and_override(client, monkeypatch):
+    roles = client.get("/api/v1/codelists").json()["status_roles"]
+    assert roles == {"inspected": "Inspected", "report_complete": "Report Complete",
+                     "report_sent": ["Sent to RSM", "Issued to Customer"]}
+    monkeypatch.setenv("MOCK_STATUS_ROLES", '{"report_complete": "Built", "report_sent": ["Mailed"]}')
+    r = client.get("/api/v1/codelists")
+    assert r.json()["status_roles"] == {"inspected": "Inspected", "report_complete": "Built", "report_sent": ["Mailed"]}
+    # The ETag follows the content, so the tablet picks up the rename on its next refresh.
+    assert client.get("/api/v1/codelists", headers={"If-None-Match": r.headers["ETag"]}).status_code == 304
+    monkeypatch.delenv("MOCK_STATUS_ROLES")
+    assert client.get("/api/v1/codelists", headers={"If-None-Match": r.headers["ETag"]}).status_code == 200
