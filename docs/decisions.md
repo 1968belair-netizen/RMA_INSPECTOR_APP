@@ -229,3 +229,8 @@ Goal: the SAP S/4HANA cutover changes only the server's backend connector — no
 - Blank / unknown / System-Unit product types: full access. Scroll: read-only.
 - Tablet has full control of the parts grid, including desk-entered rows.
 - Defect code, summaries 1–3, `inspected_by`, `summary_by` are on the tablet; the workbench is a companion.
+
+## 2026-11-19 — App renamed "BITZER Inspect"
+- User-visible name is now **BITZER Inspect** (app label, sign-in and home headers, APK file `BITZER-Inspect-0.1.N-debug.apk`, workflow artifact, docs, mock server title).
+- **Unchanged on purpose:** `applicationId` / package `com.bitzer.rmainspector` (changing it makes Android treat the app as new and breaks in-place updates), the Kotlin package folders, the repo name, signing, and internal identifiers `RmaInspectorApp`, `RmaInspectorTheme`, `Theme.RmaInspector`.
+- New launcher icon: Gemini "Option 1" design as drawn (see the project note "BITZER Inspect: app name and icon decisions").

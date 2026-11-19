@@ -1,4 +1,4 @@
-# RMA Inspection App — Functional Spec (v1 DRAFT)
+# BITZER Inspect — Functional Spec (v1 DRAFT)
 
 _Rev 7 — 2026-11-18 (Jacob's layout decisions: sign-in, camera search, Received-only work list with product-type
 and return-code chips, inspection workspace with Findings / Photos / Report tabs, guided inspection, status rules
