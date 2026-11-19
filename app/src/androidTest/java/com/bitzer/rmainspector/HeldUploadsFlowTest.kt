@@ -106,7 +106,7 @@ class HeldUploadsFlowTest {
             compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
         } catch (e: Throwable) {
             throw AssertionError("No sign-out prompt. Queue: ${queue.snapshot().map { it.state.name + "/" + it.inspector.username }}\n" +
-                compose.onRoot().printToString(maxDepth = 12).take(3000), e)
+                compose.onRoot().printToString(maxDepth = 12).replace("\n", " | ").replace(Regex("\\s+"), " ").take(2500), e)
         }
         compose.waitUntilAtLeastOneExists(hasText("You have 1 upload waiting."), timeoutMillis = 10_000)
         compose.onNodeWithTag(QueueTags.SIGN_OUT_ANYWAY).performSemanticsAction(SemanticsActions.OnClick)
