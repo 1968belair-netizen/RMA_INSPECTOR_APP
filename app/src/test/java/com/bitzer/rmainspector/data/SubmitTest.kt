@@ -286,7 +286,9 @@ class SubmitTest {
         assertTrue(changed.message.contains(SubmitErrors.KEPT))
 
         val locked = SubmitErrors.map(fail(code = "RMA_LOCKED", status = 423, msg = "Open in Macola by JDOE2."))
-        assertTrue(locked.message.startsWith("Open in Macola by JDOE2."))
+        assertEquals("Open in Macola", locked.title)
+        assertTrue(locked.message.startsWith("Open in Macola by another user — will retry"))
+        assertTrue(locked.message.contains(SubmitErrors.KEPT))
         assertFalse(locked.offline)
 
         assertEquals("The server rejected the findings", SubmitErrors.map(fail(status = 422, code = "VALIDATION_FAILED")).title)
