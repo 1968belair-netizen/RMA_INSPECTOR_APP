@@ -46,6 +46,7 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     private val recent = ServiceLocator.recentCodes(app)
     private val drafts = ServiceLocator.reportDrafts(app)
     private val auth = ServiceLocator.auth(app)
+    private val queue = ServiceLocator.uploadQueue(app)
 
     private val _state = MutableStateFlow(ReportState())
     val state: StateFlow<ReportState> = _state.asStateFlow()
@@ -77,6 +78,26 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
         loadPhotos()
     }
 
+    /** Queue items of this inspector for this RMA that a changed `Report Pics ` folder blocked. */
+    private fun blockedPicsItems() = auth.session.value?.user?.username?.let { u ->
+        queue.snapshot().filter { it.rmaId == rmaId && it.inspector.username == u && it.isBlocked && it.reasonCode == "REPORT_PICS_CHANGED" }
+    }.orEmpty()
+
+    /** The inspector decided: the blocked queue items are done with (the report is rebuilt from the Submit report button). */
+    private fun clearBlockedPics(): Boolean {
+        val items = blockedPicsItems()
+        items.forEach { runCatching { queue.remove(it.id) } }
+        return items.isNotEmpty()
+    }
+
+    /** After a conflict was resolved on disk: read the draft again even though the RMA signature may be unchanged. */
+    fun forceRefresh(detail: RmaDetail?) {
+        if (detail == null) return
+        listing = null
+        rma = detail
+        loadPhotos()
+    }
+
     fun loadPhotos() {
         val detail = rma ?: return
         viewModelScope.launch {
@@ -97,6 +118,9 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
                         is ApiResult.Failure -> ReportPhotosLoad.Error(r.message)
                     },
                     conflict = if (merged.serverChanged && photos != null) {
+                        ReportPicsConflict(photos.reportPics.files, photos.reportPics.signature)
+                    } else if (photos != null && blockedPicsItems().isNotEmpty()) {
+                        // A queued report rebuild was blocked by REPORT_PICS_CHANGED: review it here (spec §6.5, §6.6).
                         ReportPicsConflict(photos.reportPics.files, photos.reportPics.signature)
                     } else it.conflict,
                 )
@@ -213,13 +237,16 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     fun conflictUseServer() {
         val c = _state.value.conflict ?: return
         edit { it.adoptServer(c.current, c.currentSignature) }
-        _state.update { it.copy(conflict = null, message = ReportMessage("Using the report photos from the server.")) }
+        val queued = clearBlockedPics()
+        _state.update { it.copy(conflict = null, message = ReportMessage("Using the report photos from the server." +
+            if (queued) " Use Submit report to rebuild the report." else "")) }
     }
 
     /** Inspector keeps their picks and saves over the server's list — an explicit choice, then the normal save. */
     fun conflictKeepMine() {
         val c = _state.value.conflict ?: return
         edit { it.rebase(c.currentSignature) }
+        clearBlockedPics()
         _state.update { it.copy(conflict = null) }
         savePicks()
     }

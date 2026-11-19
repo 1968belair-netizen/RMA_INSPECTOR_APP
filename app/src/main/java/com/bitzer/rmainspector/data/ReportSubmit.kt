@@ -174,7 +174,11 @@ enum class SubmitStep(val label: String) {
 enum class SubmitErrorKind { GENERIC, FILE_IN_USE, PICS_CHANGED, CHANGED_ELSEWHERE, LOCKED, VALIDATION, UNREACHABLE }
 
 /** A failure the inspector sees: always says that nothing was lost or overwritten. */
-data class SubmitError(val kind: SubmitErrorKind, val title: String, val message: String, val retryable: Boolean)
+data class SubmitError(
+    val kind: SubmitErrorKind, val title: String, val message: String, val retryable: Boolean,
+    /** For [SubmitErrorKind.CHANGED_ELSEWHERE]: the RMA as the server has it now (null = the screen fetches it). */
+    val current: RmaDetail? = null,
+)
 
 /** Error mapping for the submit flow (api §6, §7, §9). Messages are for the inspector, not for logs. */
 fun submitErrorFor(f: ApiResult.Failure): SubmitError {
@@ -188,7 +192,7 @@ fun submitErrorFor(f: ApiResult.Failure): SubmitError {
         f.code == "REPORT_PICS_CHANGED" -> SubmitError(SubmitErrorKind.PICS_CHANGED, "Report photos changed",
             "The report photos were changed on the server after you loaded them. Nothing was overwritten. Review the photos in Arrange, then submit again.", false)
         f.code == "RMA_CHANGED" -> SubmitError(SubmitErrorKind.CHANGED_ELSEWHERE, "RMA changed elsewhere",
-            "Someone changed this RMA after you loaded it. Nothing was saved. The RMA reloads now; $kept", false)
+            "Someone changed this RMA after you loaded it. Nothing was saved. Next you review what changed; $kept", false, conflictCurrent(f.details))
         f.code == "RMA_LOCKED" || f.code == "LOCK_CHECK_FAILED" -> SubmitError(SubmitErrorKind.LOCKED, "RMA is locked",
             f.message + " $kept", true)
         f.code == "VALIDATION_FAILED" || f.httpStatus == 422 -> SubmitError(SubmitErrorKind.VALIDATION, "Can't submit yet",

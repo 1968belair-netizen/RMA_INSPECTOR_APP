@@ -131,7 +131,7 @@ class UploadQueueEngine(
         if (item.rebuildReport) {
             if (!stillSignedIn(session)) { release(id); return false }
             when (val r = gateway.rebuildReport(item.rmaId, item.id, token)) {
-                is ApiResult.Failure -> if (QueueRules.decide(r) != QueueDecision.BLOCK) { fail(id, r, session); return false }
+                is ApiResult.Failure -> if (QueueRules.isConflict(r.code) || QueueRules.decide(r) != QueueDecision.BLOCK) { fail(id, r, session); return false }
                 is ApiResult.Ok -> Unit
             }
         }

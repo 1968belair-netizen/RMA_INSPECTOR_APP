@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.Draft
+import com.bitzer.rmainspector.data.conflictCurrent
 import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.LocalPhoto
 import com.bitzer.rmainspector.data.LockHandling
@@ -63,6 +64,11 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     /** Emits when the RMA changed on the server (or photos were sent): the workspace reloads. */
     val refresh: SharedFlow<Unit> = _refresh.asSharedFlow()
 
+    private val _conflicts = MutableSharedFlow<ConflictRequest>(extraBufferCapacity = 2)
+
+    /** `409 RMA_CHANGED`: the conflict screen opens for this request (spec §6.5). Never retried automatically. */
+    val conflicts: SharedFlow<ConflictRequest> = _conflicts.asSharedFlow()
+
     private var input: SubmitInput? = null
     private var attempt: Pair<String, String>? = null // (submission_id, fingerprint) of the last failed attempt
 
@@ -109,6 +115,15 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
 
             val saved = when (val r = api.submitInspection(base, rmaId, payloadFor(id))) {
                 is ApiResult.Failure -> {
+                    if (r.code == "RMA_CHANGED") {
+                        attempt = null
+                        val who = auth.session.value?.user
+                        if (who != null && who.username == inp.username) {
+                            _phase.value = InspectionSubmitPhase.Closed
+                            _conflicts.tryEmit(ConflictRequest(inp.base, conflictCurrent(r.details), inp.rows, inp.report, who.toDraftInspector(), inp.codes))
+                            return@launch
+                        }
+                    }
                     // Fail closed (#66): a Macola lock / unconfirmed lock keeps everything and retries the same submit later.
                     if (QueueableFailure.isQueueable(r) && enqueue(inp, review, payloadFor(id), id, saved = false, rows = inp.rows,
                             photos = inp.pendingPhotos, offline = r.kind == ApiResult.Kind.UNREACHABLE, reason = QueueRules.reasonFor(r),
