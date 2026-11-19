@@ -443,3 +443,7 @@ object ConflictSummary {
             fieldsDirty = dirty, rmaSignature = current.signature)
     }
 }
+
+/** `details.current` of `409 RMA_CHANGED` (api §7) as an RMA; null when the server didn't send a readable one (the screen then fetches it). */
+fun conflictCurrent(details: kotlinx.serialization.json.JsonObject?): RmaDetail? =
+    runCatching { details?.get("current")?.let { ApiClient.defaultJson.decodeFromJsonElement(RmaDetail.serializer(), it) } }.getOrNull()

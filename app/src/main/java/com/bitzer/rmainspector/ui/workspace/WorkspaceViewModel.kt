@@ -59,6 +59,11 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     private val photoStore = ServiceLocator.photos(app)
     private val guidedStore = ServiceLocator.guidedProgress(app)
     private val appContext = app.applicationContext
+    private val queue = ServiceLocator.uploadQueue(app)
+
+    /** The queue's blocked conflict was already offered for this screen (it opens once; the banner Review reopens it). */
+    private var queuedConflictOffered = false
+    private var queuedPicsOffered = false
 
     /** Thumbnails for the Photos tab (device files + server thumbnails). */
     val thumbs = AndroidPhotoThumbs(
@@ -122,7 +127,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
         super.onCleared()
     }
 
-    fun load() {
+    fun load(after: (() -> Unit)? = null) {
         viewModelScope.launch {
             val current = _state.value.load
             _state.update {
@@ -130,7 +135,7 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
             }
             val base = store.settings.first().serverUrl
             when (val r = api.rmaDetail(base, rmaId)) {
-                is ApiResult.Ok -> applyLoaded(r.value)
+                is ApiResult.Ok -> { applyLoaded(r.value); after?.invoke() }
                 is ApiResult.Failure -> _state.update { it.copy(load = WorkspaceLoad.Error(r.message, notFound = r.code == "RMA_NOT_FOUND")) }
             }
             updateGuided()
@@ -385,8 +390,49 @@ class WorkspaceViewModel(app: Application, saved: SavedStateHandle) : AndroidVie
     /** Leave the guided screen; progress stays, so the header button says Continue. */
     fun guidedExit() = _state.update { it.copy(guidedRun = null) }
 
-    /** Conflict review (spec §6.5) comes with Submit in milestone B. */
-    fun reviewChanges() = Unit
+    // ------------------------------------------------------------------------------------------ Conflicts (B4b)
+
+    /**
+     * What the conflict screen needs (spec §6.5). With no [base] it is the RMA the draft was started from, and
+     * [current] the RMA as loaded now; null when there is nothing to compare (no draft). Flushes a pending draft write.
+     */
+    fun conflictRequest(base: RmaDetail? = null, current: RmaDetail? = null): ConflictRequest? {
+        val s = _state.value
+        val user = auth.session.value?.user ?: return null
+        pending.getAndSet(null)?.let { runCatching { runOp(it) } }
+        val b = base ?: draft?.base ?: return null
+        val cur = current ?: s.rma
+        return ConflictRequest(b, cur, s.findingRows, ServiceLocator.reportDrafts(appContext).get(rmaId), user.toDraftInspector(), s.findings.codes)
+    }
+
+    private fun blocked(code: String) = auth.session.value?.user?.username?.let { u ->
+        queue.snapshot().any { it.rmaId == rmaId && it.inspector.username == u && it.isBlocked && it.reasonCode == code }
+    } == true
+
+    /** True once when the upload queue holds this RMA's submit blocked by `409 RMA_CHANGED` — the screen opens (spec §6.6). */
+    fun takeQueuedConflict(): Boolean {
+        if (queuedConflictOffered || !blocked("RMA_CHANGED")) return false
+        queuedConflictOffered = true
+        return true
+    }
+
+    /** True once when a queued report rebuild was blocked by `409 REPORT_PICS_CHANGED`: the Report tab opens with its review dialog. */
+    fun takeQueuedPicsConflict(): Boolean {
+        if (queuedPicsOffered || !blocked("REPORT_PICS_CHANGED")) return false
+        queuedPicsOffered = true
+        selectTab(WorkspaceTab.REPORT)
+        return true
+    }
+
+    /** The conflict was resolved (draft rewritten or removed on disk): forget what is cached and reload the RMA. */
+    fun afterConflict(after: () -> Unit) {
+        pending.set(null)
+        draft = null
+        draftOwner = null
+        queuedConflictOffered = false
+        _state.update { it.copy(selection = null) }
+        load(after)
+    }
 
     // ------------------------------------------------------------------------------------------ Submit (B3)
 

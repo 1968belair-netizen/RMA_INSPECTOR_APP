@@ -105,7 +105,7 @@ class ReportSubmitViewModel(app: Application, saved: SavedStateHandle) : Android
         val kind = failedError?.kind
         _state.update { it.copy(phase = SubmitPhase.Idle) }
         when (kind) {
-            SubmitErrorKind.CHANGED_ELSEWHERE -> _events.tryEmit(SubmitEvent.ReloadRma)
+            SubmitErrorKind.CHANGED_ELSEWHERE -> _events.tryEmit(SubmitEvent.Conflict(rma, failedError?.current))
             SubmitErrorKind.PICS_CHANGED -> _events.tryEmit(SubmitEvent.ReloadPhotos)
             else -> Unit
         }

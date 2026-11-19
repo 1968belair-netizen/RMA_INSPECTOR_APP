@@ -134,12 +134,30 @@ fun WorkspaceScreen(
     reportVm: ReportViewModel = viewModel(),
     submitVm: ReportSubmitViewModel = viewModel(),
     inspectionVm: SubmitViewModel = viewModel(),
+    conflictVm: ConflictViewModel = viewModel(),
 ) {
     val base by vm.state.collectAsStateWithLifecycle()
     val report by reportVm.state.collectAsStateWithLifecycle()
     val inspection by inspectionVm.phase.collectAsStateWithLifecycle()
+    val conflict by conflictVm.phase.collectAsStateWithLifecycle()
     val rma = base.rma
     LaunchedEffect(rma) { if (rma != null) reportVm.setRma(rma) }
+    // Conflicts (spec §6.5): a 409 on submit, the "changed elsewhere" banner, or a queue item blocked by a 409.
+    LaunchedEffect(Unit) { inspectionVm.conflicts.collect { conflictVm.open(it) } }
+    LaunchedEffect(Unit) {
+        conflictVm.outcomes.collect { o ->
+            if (o is ConflictOutcome.Resolved) vm.afterConflict {
+                reportVm.forceRefresh(vm.state.value.rma)
+                if (o.openReview) inspectionVm.open(vm.submitInput())
+            }
+        }
+    }
+    LaunchedEffect(rma?.signature) {
+        if (rma != null) {
+            if (vm.takeQueuedConflict()) vm.conflictRequest()?.let { conflictVm.open(it) }
+            vm.takeQueuedPicsConflict()
+        }
+    }
     // The inspection submit saved something: the draft is gone, so reload the RMA from the server.
     LaunchedEffect(Unit) { inspectionVm.refresh.collect { vm.afterSubmit() } }
     val submit by submitVm.state.collectAsStateWithLifecycle()
@@ -148,6 +166,7 @@ fun WorkspaceScreen(
             when (e) {
                 is SubmitEvent.DraftChanged -> reportVm.applyDraft(e.draft)
                 SubmitEvent.ReloadRma -> vm.load()
+                is SubmitEvent.Conflict -> vm.conflictRequest(e.base, e.current)?.let { conflictVm.open(it) } ?: vm.load()
                 SubmitEvent.ReloadPhotos -> reportVm.loadPhotos()
             }
         }
@@ -206,7 +225,7 @@ fun WorkspaceScreen(
             onSelect = vm::select,
             onToggleFailureInfo = vm::toggleFailureInfo,
             onGuided = vm::startGuided,
-            onReviewChanges = vm::reviewChanges,
+            onReviewChanges = { vm.conflictRequest()?.let { conflictVm.open(it) } },
             onAddPart = vm::addPart,
             onSetPart = vm::setPart,
             onSetIssue = vm::setIssue,
@@ -232,6 +251,15 @@ fun WorkspaceScreen(
         thumbs = vm.thumbs,
         overlay = { s, cb ->
             if (s.photos.capture != null) CameraOverlay(s.photos, cb)
+            ConflictOverlay(
+                conflict,
+                ConflictCallbacks(
+                    onPick = conflictVm::pick, onKeepMine = conflictVm::keepMine, onAskDiscard = conflictVm::askDiscard,
+                    onCancelDiscard = conflictVm::cancelDiscard, onDiscard = conflictVm::discard,
+                    onSendPhotos = conflictVm::sendPhotosOnly, onLater = conflictVm::later,
+                ),
+                onCloseFailed = conflictVm::closeFailed,
+            )
             ReportSubmitOverlay(submit, ReportSubmitCallbacks(
                 onConfirm = submitVm::confirm, onCancel = submitVm::cancel, onFix = submitVm::fix, onIgnore = submitVm::ignore,
                 onAddToDictionary = submitVm::addToDictionary, onSpellContinue = submitVm::spellContinue,
