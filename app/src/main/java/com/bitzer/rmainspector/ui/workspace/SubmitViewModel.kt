@@ -6,6 +6,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.Draft
+import com.bitzer.rmainspector.data.FindingRow
+import com.bitzer.rmainspector.data.LocalPhoto
+import com.bitzer.rmainspector.data.PhotoUpload
+import com.bitzer.rmainspector.data.QueueItem
+import com.bitzer.rmainspector.data.QueueRules
+import com.bitzer.rmainspector.data.QueueableFailure
+import com.bitzer.rmainspector.data.toDraftInspector
 import com.bitzer.rmainspector.data.PhotoOutcome
 import com.bitzer.rmainspector.data.PhotoUploadRunner
 import com.bitzer.rmainspector.data.PhotoUploadSummary
@@ -34,7 +41,8 @@ import java.util.UUID
 /**
  * Submit inspection (spec §6.1, api §7–8): review → save parts + summary + status → upload the unsent photos → done.
  * The workspace hands over a [SubmitInput] snapshot with [open]; nothing is sent before the inspector taps SUBMIT.
- * If anything fails the draft and the photos stay on the tablet (spec §6.4); there is no queue yet (issue #9).
+ * If the server can't be reached (or answers 503) the submit goes into the upload queue (spec §6.4, [UploadQueueEngine]);
+ * any other failure keeps the draft and the photos on the tablet and says why.
  */
 class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewModel(app) {
     val rmaId: String = checkNotNull(saved.get<String>(WorkspaceViewModel.ARG_RMA_ID))
@@ -43,6 +51,8 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     private val drafts = ServiceLocator.drafts(app)
     private val photoStore = ServiceLocator.photos(app)
     private val reportDrafts = ServiceLocator.reportDrafts(app)
+    private val queue = ServiceLocator.uploadQueue(app)
+    private val auth = ServiceLocator.auth(app)
 
     private val _phase = MutableStateFlow<InspectionSubmitPhase>(InspectionSubmitPhase.Closed)
     val phase: StateFlow<InspectionSubmitPhase> = _phase.asStateFlow()
@@ -97,10 +107,15 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
             attempt = id to fingerprint
 
             val saved = when (val r = api.submitInspection(base, rmaId, payloadFor(id))) {
-                is ApiResult.Failure -> { fail(SubmitErrors.map(r)); return@launch }
+                is ApiResult.Failure -> {
+                    if (QueueableFailure.isQueueable(r) && enqueue(inp, review, payloadFor(id), id, saved = false, rows = inp.rows,
+                            photos = inp.pendingPhotos, offline = r.kind == ApiResult.Kind.UNREACHABLE, reason = QueueRules.reasonFor(r))) return@launch
+                    fail(SubmitErrors.map(r)); return@launch
+                }
                 is ApiResult.Ok -> r.value
             }
             attempt = null
+            runCatching { queue.supersede(inp.username, rmaId) } // an older queued copy of this submit is stale now
 
             // The server gave the rows new ids: the rows and their photos follow them (api §7).
             val rows = if (saved.parts.size == inp.rows.size)
@@ -138,6 +153,12 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
                 }
             }
 
+            if (upload.stoppedOffline) {
+                // The findings are saved; the photos (and the report rebuild) wait in the queue.
+                val left = photoStore.pending(inp.username, rmaId)
+                if (enqueue(inp, review, payloadFor(id), id, saved = true, rows = rows, photos = left, offline = true, reason = "Can't reach the server.")) return@launch
+            }
+
             var rebuilt: Boolean? = null
             var rebuildProblem: String? = null
             if (plan.rebuildsReport) {
@@ -162,6 +183,35 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
                 ),
             )
         }
+    }
+
+    /**
+     * Stores the submit in the upload queue under the signed-in inspector's name. False = it couldn't be queued
+     * (nobody signed in, or the disk write failed) — the caller then shows the normal problem dialog.
+     */
+    private fun enqueue(
+        inp: SubmitInput, review: SubmitReview, payload: kotlinx.serialization.json.JsonObject, id: String,
+        saved: Boolean, rows: List<FindingRow>, photos: List<LocalPhoto>, offline: Boolean, reason: String,
+    ): Boolean {
+        val user = auth.session.value?.user ?: return false
+        if (user.username != inp.username) return false
+        val ids = photos.filter { PhotoUpload.meta(it, rows) != null }.map { it.photoId }
+        val ok = runCatching {
+            queue.supersede(user.username, rmaId)
+            queue.put(
+                QueueItem(
+                    id = id, rmaId = rmaId, displayNumber = inp.rma.displayNumber, inspector = user.toDraftInspector(),
+                    payload = payload.toString(), rows = rows, draftRows = inp.rows, photoIds = ids,
+                    inspectionSaved = saved, rebuildReport = review.plan.rebuildsReport,
+                    reason = reason, attempts = 1, nextTryAt = System.currentTimeMillis() + QueueRules.backoffMillis(1),
+                    createdAt = Draft.nowIso(),
+                ),
+            )
+        }.isSuccess
+        if (!ok) return false
+        attempt = null
+        _phase.value = InspectionSubmitPhase.Queued(SubmitQueued(findingsSaved = saved, photosQueued = ids.size, offline = offline))
+        return true
     }
 
     private fun fail(p: SubmitProblem) { _phase.value = InspectionSubmitPhase.Failed(p) }

@@ -54,6 +54,8 @@ object SubmitTags {
     const val WORKING = "submit_working"
     const val DONE = "submit_done"
     const val DONE_CLOSE = "submit_done_close"
+    const val QUEUED = "submit_queued"
+    const val QUEUED_CLOSE = "submit_queued_close"
     const val FAILED = "submit_failed"
     const val FAILED_CLOSE = "submit_failed_close"
 }
@@ -71,6 +73,7 @@ fun SubmitOverlay(phase: InspectionSubmitPhase, cb: SubmitCallbacks) {
         }
         is InspectionSubmitPhase.Working -> WorkingScreen(phase)
         is InspectionSubmitPhase.Done -> DoneScreen(phase.done, cb)
+        is InspectionSubmitPhase.Queued -> QueuedContent(phase.queued, cb.onClose)
         is InspectionSubmitPhase.Failed -> SubmitProblemDialog(phase.problem, cb.onClose)
     }
 }
@@ -219,5 +222,25 @@ private fun DoneScreen(d: SubmitDone, cb: SubmitCallbacks) {
             null -> Unit
         }
         d.warnings.forEach { Text("Note: $it", style = MaterialTheme.typography.bodyMedium, color = BitzerColors.Grey90) }
+    }
+}
+
+/** "Queued — will send when online" (spec §6.4). Stateless, so the screenshot tests can draw it. */
+@Composable
+fun QueuedContent(q: SubmitQueued, onClose: () -> Unit) {
+    ScreenFrame(
+        SubmitTags.QUEUED, "Queued", null,
+        actions = {
+            Spacer(Modifier.weight(1f))
+            Button(onClick = onClose, modifier = Modifier.heightIn(min = 56.dp).testTag(SubmitTags.QUEUED_CLOSE),
+                colors = ButtonDefaults.buttonColors(containerColor = BitzerColors.Green)) { Text("DONE") }
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Filled.Info, contentDescription = null, tint = BitzerColors.DarkGreen, modifier = Modifier.padding(end = 4.dp))
+            Text(q.headline, style = MaterialTheme.typography.headlineSmall)
+        }
+        Text(q.detail, style = MaterialTheme.typography.bodyLarge)
+        Text("Nothing is lost, and nothing is sent under another user's name.", style = MaterialTheme.typography.bodyMedium, color = BitzerColors.Grey60)
     }
 }

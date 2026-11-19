@@ -2,6 +2,7 @@ package com.bitzer.rmainspector.data
 
 import android.content.Context
 import com.bitzer.rmainspector.BuildConfig
+import kotlinx.coroutines.flow.first
 import java.io.File
 
 /** One settings store, one session store and one HTTP client for the whole app. */
@@ -65,6 +66,33 @@ object ServiceLocator {
     fun reportDrafts(context: Context): ReportDraftStore =
         reportDraftStore ?: synchronized(this) {
             reportDraftStore ?: ReportDraftStore(File(context.applicationContext.filesDir, "report_drafts/report_drafts.json")).also { reportDraftStore = it }
+        }
+
+    @Volatile private var queueStore: UploadQueueStore? = null
+    @Volatile private var queueRunner: UploadQueueRunner? = null
+
+    /** The upload queue (spec §6.6). Survives sign-out and restarts; only a send or a cancel removes an item. */
+    fun uploadQueue(context: Context): UploadQueueStore =
+        queueStore ?: synchronized(this) {
+            queueStore ?: UploadQueueStore(File(context.applicationContext.filesDir, "queue/queue.json")).also { queueStore = it }
+        }
+
+    /** Sends the queue in the background while the app runs; call [UploadQueueRunner.kick] after a sign-in. */
+    fun uploadQueueRunner(context: Context): UploadQueueRunner =
+        queueRunner ?: synchronized(this) {
+            queueRunner ?: run {
+                val app = context.applicationContext
+                val auth = auth(app)
+                val settings = settings(app)
+                val engine = UploadQueueEngine(
+                    store = uploadQueue(app),
+                    gateway = ApiQueueGateway(api) { settings.settings.first().serverUrl },
+                    photos = photos(app), drafts = drafts(app), reportDrafts = reportDrafts(app),
+                    currentSession = { auth.session.value },
+                    onUnauthorized = { auth.expire(it) },
+                )
+                UploadQueueRunner(engine).also { queueRunner = it }
+            }
         }
 
     fun settings(context: Context): SettingsStore =

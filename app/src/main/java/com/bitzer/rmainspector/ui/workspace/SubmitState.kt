@@ -20,6 +20,27 @@ data class SubmitDone(
     val warnings: List<String> = emptyList(),
 )
 
+/**
+ * The submit could not finish (offline / `503`) and was put in the upload queue (spec §6.4). Nothing is lost.
+ * [findingsSaved] = the server already has the findings; only [photosQueued] photos wait.
+ */
+data class SubmitQueued(
+    val findingsSaved: Boolean,
+    val photosQueued: Int,
+    /** True = the server can't be reached; false = it answered but can't save yet (e.g. Macola lock unconfirmed). */
+    val offline: Boolean = true,
+) {
+    val headline: String get() = if (offline) QUEUED_HEADLINE else "Queued — will retry"
+    val detail: String get() = when {
+        findingsSaved -> "The findings are saved. $photosQueued photo${if (photosQueued == 1) "" else "s"} will be uploaded " +
+            if (offline) "when this tablet is back on the network." else "shortly."
+        offline -> "Your findings and photos stay on this tablet and are sent automatically when it is back on the network."
+        else -> "The server couldn't confirm it is safe to save yet. Nothing was saved. Your findings and photos stay on this tablet and are sent automatically."
+    }
+
+    companion object { const val QUEUED_HEADLINE = "Queued — will send when online" }
+}
+
 /** The submit flow (spec §6.1): review → (status warning) → saving / uploading → done, or a problem dialog. */
 sealed interface InspectionSubmitPhase {
     data object Closed : InspectionSubmitPhase
@@ -31,6 +52,9 @@ sealed interface InspectionSubmitPhase {
     data class Working(val step: String, val done: Int = 0, val total: Int = 0) : InspectionSubmitPhase
 
     data class Done(val done: SubmitDone) : InspectionSubmitPhase
+
+    /** Put in the upload queue; it sends by itself (spec §6.4). */
+    data class Queued(val queued: SubmitQueued) : InspectionSubmitPhase
 
     /** Nothing was lost: the draft and the photos are still on the tablet. */
     data class Failed(val problem: SubmitProblem) : InspectionSubmitPhase

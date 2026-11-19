@@ -48,21 +48,21 @@ private val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
 private val JPEG_TYPE = "image/jpeg".toMediaType()
 
 /** `POST /rmas/{id}/inspection` — [payload] is built by [SubmitPayload.build]. */
-suspend fun ApiClient.submitInspection(baseUrl: String, rmaId: String, payload: JsonObject): ApiResult<InspectionSaved> =
+suspend fun ApiClient.submitInspection(baseUrl: String, rmaId: String, payload: JsonObject, token: String? = null): ApiResult<InspectionSaved> =
     send(ApiClient.url(baseUrl, "rmas", rmaId, "inspection"), baseUrl, InspectionSaved.serializer(),
-        payload.toString().toRequestBody(JSON_TYPE))
+        payload.toString().toRequestBody(JSON_TYPE), explicitToken = token)
 
 /** `POST /rmas/{id}/photos` (multipart `meta` + `file`). `201` and a replayed `200` are both success. */
-suspend fun ApiClient.uploadPhoto(baseUrl: String, rmaId: String, meta: PhotoMetaWrite, file: File): ApiResult<PhotoUploaded> {
+suspend fun ApiClient.uploadPhoto(baseUrl: String, rmaId: String, meta: PhotoMetaWrite, file: File, token: String? = null): ApiResult<PhotoUploaded> {
     val body = MultipartBody.Builder().setType(MultipartBody.FORM)
         .addFormDataPart("meta", ApiClient.writeJson.encodeToString(PhotoMetaWrite.serializer(), meta))
         .addFormDataPart("file", meta.photoId + ".jpg", file.asRequestBody(JPEG_TYPE))
         .build()
-    return send(ApiClient.url(baseUrl, "rmas", rmaId, "photos"), baseUrl, PhotoUploaded.serializer(), body)
+    return send(ApiClient.url(baseUrl, "rmas", rmaId, "photos"), baseUrl, PhotoUploaded.serializer(), body, explicitToken = token)
 }
 
 /** `POST /rmas/{id}/report` — regenerate PDF + XLSX after "Update inspection findings" (api §9.3). */
-suspend fun ApiClient.rebuildReportAfterSubmit(baseUrl: String, rmaId: String, submissionId: String): ApiResult<ReportRebuilt> {
+suspend fun ApiClient.rebuildReportAfterSubmit(baseUrl: String, rmaId: String, submissionId: String, token: String? = null): ApiResult<ReportRebuilt> {
     val json = """{"submission_id":"$submissionId","formats":["pdf","xlsx"]}"""
-    return send(ApiClient.url(baseUrl, "rmas", rmaId, "report"), baseUrl, ReportRebuilt.serializer(), json.toRequestBody(JSON_TYPE))
+    return send(ApiClient.url(baseUrl, "rmas", rmaId, "report"), baseUrl, ReportRebuilt.serializer(), json.toRequestBody(JSON_TYPE), explicitToken = token)
 }

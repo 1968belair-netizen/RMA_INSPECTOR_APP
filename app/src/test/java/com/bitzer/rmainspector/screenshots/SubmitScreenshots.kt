@@ -12,6 +12,7 @@ import com.bitzer.rmainspector.data.SubmitInput
 import com.bitzer.rmainspector.data.SubmitReview
 import com.bitzer.rmainspector.ui.theme.RmaInspectorTheme
 import com.bitzer.rmainspector.ui.workspace.SubmitDone
+import com.bitzer.rmainspector.ui.workspace.SubmitQueued
 import com.bitzer.rmainspector.ui.workspace.InspectionSubmitPhase
 import com.bitzer.rmainspector.ui.workspace.WorkspaceCallbacks
 import com.bitzer.rmainspector.ui.workspace.WorkspaceContent
@@ -67,6 +68,9 @@ abstract class InspectionSubmitCatalog(private val device: String) {
         InspectionSubmitPhase.Done(SubmitDone("Inspected", statusChanged = true, partsSaved = true, photosSent = 1,
             photoProblems = listOf("Can't reach the server at http://rma-server.example.invalid.")))
     )
+    @Test fun submit_queued() = shot("submit_queued", InspectionSubmitPhase.Queued(SubmitQueued(findingsSaved = false, photosQueued = 3)))
+    @Test fun submit_queued_photos_only() = shot("submit_queued_photos_only",
+        InspectionSubmitPhase.Queued(SubmitQueued(findingsSaved = true, photosQueued = 2)))
     @Test fun submit_offline() = shot("submit_offline",
         InspectionSubmitPhase.Failed(SubmitErrors.map(ApiResult.Failure(ApiResult.Kind.UNREACHABLE, "Can't reach the server.", retryable = true))))
     @Test fun submit_changed_elsewhere() = shot("submit_changed_elsewhere",

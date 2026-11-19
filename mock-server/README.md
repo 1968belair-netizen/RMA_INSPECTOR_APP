@@ -18,10 +18,10 @@ python -m uvicorn mock_server.main:app --host 0.0.0.0 --port 8000
 - Emulator: app default server URL is `http://10.0.2.2:8000/api/v1`.
 - A tablet on the same Wi-Fi as the PC: `http://<PC address>:8000/api/v1` (debug builds allow plain HTTP).
 
-## Sign-in (fake demo user)
+## Sign-in (fake demo users)
 - `POST /api/v1/auth/login` with `{"username": "demo", "password": "demo"}` → token; send
   `Authorization: Bearer <token>` on every other call. These are **fake** test credentials for the mock only.
-  Other users: set `MOCK_USERS` to JSON, e.g. `{"jdoe": {"password": "x", "display_name": "J. Doe", "initials": "JD"}}`.
+  A second fake user `demo2` / `demo2` (initials D2) exists for held-upload tests. Other users: set `MOCK_USERS` to JSON, e.g. `{"jdoe": {"password": "x", "display_name": "J. Doe", "initials": "JD"}}`.
 - There is no token-less bypass: the app signs in like it will against the real server.
 
 ## Datasets (`MOCK_DATASET`)
