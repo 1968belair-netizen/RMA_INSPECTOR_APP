@@ -148,7 +148,7 @@ object QueueRules {
     private const val MAX_DELAY = 15 * MINUTE
 
     /** A Macola lock is retried "every few minutes" (spec §6.4): never sooner than this. */
-    private const val LOCK_MIN_DELAY = 3 * MINUTE
+    private const val LOCK_MIN_DELAY = LockHandling.MIN_LOCK_RETRY_MILLIS
 
     fun backoffMillis(attempts: Int, locked: Boolean = false): Long {
         val base = if (attempts <= 0) 0L else schedule.getOrElse(attempts - 1) { MAX_DELAY }
@@ -173,8 +173,7 @@ object QueueRules {
         f.kind == ApiResult.Kind.UNREACHABLE -> "Can't reach the server."
         isConflict(f.code) -> "Changed elsewhere. Review it before sending."
         f.code == "RMA_NOT_OPEN" -> "RMA is closed. Ask the RMA team."
-        f.httpStatus == 423 || f.code == "RMA_LOCKED" -> "Open in Macola. Will retry."
-        f.code == "LOCK_CHECK_FAILED" -> "Can't confirm the Macola lock. Will retry."
+        LockHandling.isLockFailure(f) -> LockHandling.noticeFor(f)?.headline ?: f.message
         else -> f.message
     }
 
@@ -192,8 +191,8 @@ object QueueRules {
         items.filter { it.inspector.username == username && it.state != QueueState.BLOCKED }
 }
 
-/** Which failures of a submit go into the queue instead of a problem dialog (issue #64: offline and `503`). */
+/** Which failures of a submit go into the queue instead of a problem dialog (offline, `503`, and a Macola lock `423`, #66). */
 object QueueableFailure {
     fun isQueueable(f: ApiResult.Failure): Boolean =
-        f.kind == ApiResult.Kind.UNREACHABLE || f.httpStatus == 503 || f.code == "LOCK_CHECK_FAILED"
+        f.kind == ApiResult.Kind.UNREACHABLE || f.httpStatus == 503 || LockHandling.isLockFailure(f)
 }

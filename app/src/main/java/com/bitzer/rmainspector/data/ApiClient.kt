@@ -26,6 +26,8 @@ sealed interface ApiResult<out T> {
         val retryable: Boolean = false,
         /** The error envelope's `details` (e.g. `current` + `current_signature` of `REPORT_PICS_CHANGED`). */
         val details: JsonObject? = null,
+        /** The error envelope's `retry_after_seconds` (a hint for the next try, api §1.2). */
+        val retryAfterSeconds: Int? = null,
     ) : ApiResult<Nothing>
 
     enum class Kind { UNREACHABLE, SERVER_ERROR, BAD_RESPONSE }
@@ -254,6 +256,7 @@ class ApiClient(
             httpStatus = status,
             retryable = err?.retryable ?: (status >= 500),
             details = err?.details,
+            retryAfterSeconds = err?.retryAfterSeconds,
         )
     }
 
