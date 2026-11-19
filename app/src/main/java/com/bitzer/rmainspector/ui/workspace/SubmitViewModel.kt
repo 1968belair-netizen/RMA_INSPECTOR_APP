@@ -8,6 +8,7 @@ import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.Draft
 import com.bitzer.rmainspector.data.FindingRow
 import com.bitzer.rmainspector.data.LocalPhoto
+import com.bitzer.rmainspector.data.LockHandling
 import com.bitzer.rmainspector.data.PhotoUpload
 import com.bitzer.rmainspector.data.QueueItem
 import com.bitzer.rmainspector.data.QueueRules
@@ -108,8 +109,10 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
 
             val saved = when (val r = api.submitInspection(base, rmaId, payloadFor(id))) {
                 is ApiResult.Failure -> {
+                    // Fail closed (#66): a Macola lock / unconfirmed lock keeps everything and retries the same submit later.
                     if (QueueableFailure.isQueueable(r) && enqueue(inp, review, payloadFor(id), id, saved = false, rows = inp.rows,
-                            photos = inp.pendingPhotos, offline = r.kind == ApiResult.Kind.UNREACHABLE, reason = QueueRules.reasonFor(r))) return@launch
+                            photos = inp.pendingPhotos, offline = r.kind == ApiResult.Kind.UNREACHABLE, reason = QueueRules.reasonFor(r),
+                            failure = r)) return@launch
                     fail(SubmitErrors.map(r)); return@launch
                 }
                 is ApiResult.Ok -> r.value
@@ -192,6 +195,7 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     private fun enqueue(
         inp: SubmitInput, review: SubmitReview, payload: kotlinx.serialization.json.JsonObject, id: String,
         saved: Boolean, rows: List<FindingRow>, photos: List<LocalPhoto>, offline: Boolean, reason: String,
+        failure: ApiResult.Failure? = null,
     ): Boolean {
         val user = auth.session.value?.user ?: return false
         if (user.username != inp.username) return false
@@ -203,14 +207,17 @@ class SubmitViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
                     id = id, rmaId = rmaId, displayNumber = inp.rma.displayNumber, inspector = user.toDraftInspector(),
                     payload = payload.toString(), rows = rows, draftRows = inp.rows, photoIds = ids,
                     inspectionSaved = saved, rebuildReport = review.plan.rebuildsReport,
-                    reason = reason, attempts = 1, nextTryAt = System.currentTimeMillis() + QueueRules.backoffMillis(1),
+                    reason = reason, reasonCode = failure?.code, attempts = 1,
+                    nextTryAt = System.currentTimeMillis() +
+                        (failure?.let { LockHandling.retryDelayMillis(it, 1) } ?: QueueRules.backoffMillis(1)),
                     createdAt = Draft.nowIso(),
                 ),
             )
         }.isSuccess
         if (!ok) return false
         attempt = null
-        _phase.value = InspectionSubmitPhase.Queued(SubmitQueued(findingsSaved = saved, photosQueued = ids.size, offline = offline))
+        _phase.value = InspectionSubmitPhase.Queued(SubmitQueued(findingsSaved = saved, photosQueued = ids.size, offline = offline,
+            lock = failure?.let { LockHandling.noticeFor(it) }))
         return true
     }
 
