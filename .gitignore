@@ -53,6 +53,7 @@ audit_output/
 *.png
 !app/src/main/res/**/*.png
 !docs/images/*.png
+!docs/branding/*.png
 rma_tools_settings.json
 rma_tools_log.txt
 rma_tools_crash.txt
