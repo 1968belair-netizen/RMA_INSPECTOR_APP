@@ -40,8 +40,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.bitzer.rmainspector.ui.theme.BitzerColors
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import com.bitzer.rmainspector.core.RenderGate
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -51,9 +50,12 @@ import java.io.File
  */
 class PdfPageSource private constructor(private val pfd: ParcelFileDescriptor, private val renderer: PdfRenderer) {
     val pageCount: Int get() = renderer.pageCount
-    private val mutex = Mutex()
 
-    suspend fun render(index: Int, widthPx: Int): ImageBitmap? = mutex.withLock {
+    // PdfRenderer is not thread-safe: closing it while a page is rendering on another thread crashes the process
+    // (native). The gate makes close wait for a render in flight and makes later renders do nothing.
+    private val gate = RenderGate()
+
+    suspend fun render(index: Int, widthPx: Int): ImageBitmap? = gate.run {
         withContext(Dispatchers.Default) {
             runCatching {
                 val page = renderer.openPage(index)
@@ -70,9 +72,12 @@ class PdfPageSource private constructor(private val pfd: ParcelFileDescriptor, p
         }
     }
 
+    /** Returns at once; the renderer and file are closed after any render in flight has finished. */
     fun close() {
-        runCatching { renderer.close() }
-        runCatching { pfd.close() }
+        gate.close {
+            runCatching { renderer.close() }
+            runCatching { pfd.close() }
+        }
     }
 
     companion object {
