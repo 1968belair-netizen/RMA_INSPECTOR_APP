@@ -112,9 +112,9 @@ class GuidedFlowTest {
         }
 
         // Done: the completion card, then back on the workspace with the rows on Findings.
-        compose.waitUntilAtLeastOneExists(hasTestTag(GuidedTags.COMPLETE), timeoutMillis = 10_000)
-        compose.waitUntilAtLeastOneExists(hasText("INSPECTION COMPLETE"), timeoutMillis = 5_000)
-        compose.onNodeWithTag(GuidedTags.DONE).performSemanticsAction(SemanticsActions.OnClick)
+        // Match by text: the card sits in a (disabled) clickable box that can hide its test tags from the merged tree.
+        compose.waitUntilAtLeastOneExists(hasText("INSPECTION COMPLETE"), timeoutMillis = 20_000)
+        compose.onNode(hasText("Back to the workspace") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilDoesNotExist(hasTestTag(GuidedTags.SCREEN), timeoutMillis = 10_000)
         compose.waitUntilAtLeastOneExists(hasText("Guided inspection complete"), timeoutMillis = 10_000)
         compose.onNodeWithTag(WorkspaceTags.tab(WorkspaceTab.FINDINGS)).performClick()
