@@ -105,6 +105,7 @@ class HeldUploadsFlowTest {
         try {
             compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
         } catch (e: Throwable) {
+            android.util.Log.e("rmainspector-held", compose.onRoot().printToString(maxDepth = 14).replace("\n", " | ").replace(Regex("\\s+"), " ").take(3500))
             throw AssertionError("No sign-out prompt. Queue: ${queue.snapshot().map { it.state.name + "/" + it.inspector.username }}\n" +
                 compose.onRoot().printToString(maxDepth = 12).replace("\n", " | ").replace(Regex("\\s+"), " ").take(2500), e)
         }
