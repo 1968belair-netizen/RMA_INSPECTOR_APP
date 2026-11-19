@@ -101,13 +101,14 @@ class HeldUploadsFlowTest {
         back()
         compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 15_000)
         openSettings()
-        compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
+        compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick)
         try {
             compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
         } catch (e: Throwable) {
-            android.util.Log.e("rmainspector-held", compose.onRoot().printToString(maxDepth = 14).replace("\n", " | ").replace(Regex("\\s+"), " ").take(3500))
             throw AssertionError("No sign-out prompt. Queue: ${queue.snapshot().map { it.state.name + "/" + it.inspector.username }}\n" +
-                compose.onRoot().printToString(maxDepth = 12).replace("\n", " | ").replace(Regex("\\s+"), " ").take(2500), e)
+                compose.onRoot().printToString(maxDepth = 20).lines()
+                    .filter { it.contains("Text =") || it.contains("TestTag") }.joinToString(" | ") { it.trim().take(90) }.takeLast(2500), e)
         }
         compose.waitUntilAtLeastOneExists(hasText("You have 1 upload waiting."), timeoutMillis = 10_000)
         compose.onNodeWithTag(QueueTags.SIGN_OUT_ANYWAY).performSemanticsAction(SemanticsActions.OnClick)
@@ -130,7 +131,8 @@ class HeldUploadsFlowTest {
         compose.onNodeWithTag(QueueTags.item(id)).assertExists()
         compose.onAllNodes(hasTestTag(QueueTags.retry(id))).assertCountEquals(0)
         compose.onAllNodes(hasTestTag(QueueTags.cancel(id))).assertCountEquals(0)
-        compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
+        compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo()
+            .performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
         assertEquals(1, queue.snapshot().size)
 
@@ -147,7 +149,7 @@ class HeldUploadsFlowTest {
         compose.onNodeWithTag(QueueTags.SECTION).performScrollTo()
         // (If the queue's own timer got there first the item is already gone; then there is nothing to retry.)
         val retry = compose.onAllNodes(hasTestTag(QueueTags.retry(id)))
-        if (retry.fetchSemanticsNodes().isNotEmpty()) retry.onFirst().performScrollTo().performClick()
+        if (retry.fetchSemanticsNodes().isNotEmpty()) retry.onFirst().performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         waitFor(60_000) { queue.snapshot().isEmpty() }
         assertEquals("Inspected", serverStatus())
     }
