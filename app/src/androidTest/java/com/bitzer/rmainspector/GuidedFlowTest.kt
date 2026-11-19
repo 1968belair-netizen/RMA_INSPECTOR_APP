@@ -120,7 +120,7 @@ class GuidedFlowTest {
         compose.onNodeWithTag(WorkspaceTags.tab(WorkspaceTab.FINDINGS)).performClick()
         compose.waitUntilAtLeastOneExists(hasText("Terminal plate", substring = true), timeoutMillis = 15_000)
         compose.waitUntilAtLeastOneExists(hasText("Winding resistance", substring = true), timeoutMillis = 15_000)
-        compose.waitUntilAtLeastOneExists(hasText("Piston assy / skirt", substring = true), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("Thermistors", substring = true), timeoutMillis = 15_000)
     }
 
     /** Taps "Take photo" for [slot], then the fake camera's shutter (a slot photo closes the camera by itself). */
