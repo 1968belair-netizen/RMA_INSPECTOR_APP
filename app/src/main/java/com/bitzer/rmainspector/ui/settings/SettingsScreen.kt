@@ -1,6 +1,7 @@
 package com.bitzer.rmainspector.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,6 +52,12 @@ fun SettingsScreen(
     onResetServer: () -> Unit,
     onTest: () -> Unit,
     onSignOut: () -> Unit,
+    onSendBeforeSignOut: () -> Unit = {},
+    onSignOutAnyway: () -> Unit = {},
+    onDismissSignOutPrompt: () -> Unit = {},
+    onRetryQueueItem: (String) -> Unit = {},
+    onCancelQueueItem: (String) -> Unit = {},
+    now: Long = System.currentTimeMillis(),
 ) {
     val saved = state.settings?.serverUrl.orEmpty()
     var text by rememberSaveable { mutableStateOf("") }
@@ -58,6 +65,7 @@ fun SettingsScreen(
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(saved) { if (!edited) text = saved }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             BitzerTopBar(
@@ -115,6 +123,16 @@ fun SettingsScreen(
                 }
             }
 
+            if (state.user != null) {
+                UploadQueueSection(
+                    items = state.queue,
+                    username = state.user.username,
+                    onRetry = onRetryQueueItem,
+                    onCancel = onCancelQueueItem,
+                    now = now,
+                )
+            }
+
             ScreenHeader("App info")
             Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
                 Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
@@ -123,5 +141,7 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+    state.signOutPrompt?.let { SignOutPromptModal(it, onSendNow = onSendBeforeSignOut, onSignOutAnyway = onSignOutAnyway, onStay = onDismissSignOutPrompt) }
     }
 }

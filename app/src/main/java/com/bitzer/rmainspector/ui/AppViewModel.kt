@@ -10,6 +10,11 @@ import com.bitzer.rmainspector.data.ApiResult
 import com.bitzer.rmainspector.data.AppSettings
 import com.bitzer.rmainspector.data.CodeListRepository
 import com.bitzer.rmainspector.data.Health
+import com.bitzer.rmainspector.data.QueueItem
+import com.bitzer.rmainspector.data.QueueItemRules
+import com.bitzer.rmainspector.data.QueueRules
+import com.bitzer.rmainspector.data.SignOutPrompt
+import com.bitzer.rmainspector.data.SignOutRules
 import com.bitzer.rmainspector.data.ServiceLocator
 import com.bitzer.rmainspector.data.Session
 import com.bitzer.rmainspector.data.User
@@ -44,6 +49,12 @@ data class AppUiState(
     val signIn: SignInProgress = SignInProgress(),
     /** The server rejected the token mid-session: sign-in is shown over the current screen (decision 2026-11-18). */
     val sessionExpired: Boolean = false,
+    /** The whole upload queue on this tablet (all inspectors); Settings groups it (spec §6.6). */
+    val queue: List<QueueItem> = emptyList(),
+    /** Sign out tapped with uploads waiting (spec §2); null = no prompt. */
+    val signOutPrompt: SignOutPrompt? = null,
+    /** "N uploads waiting from your earlier session" on Home after signing in; 0 = no banner. */
+    val earlierUploads: Int = 0,
 ) {
     val signedIn: Boolean get() = user != null
 }
@@ -56,17 +67,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val codeLists = ServiceLocator.codeLists(app)
     private val connection = MutableStateFlow<Connection>(Connection.Unknown)
     private val signIn = MutableStateFlow(SignInProgress())
+    private val queue = ServiceLocator.uploadQueue(app)
+    private val engine = ServiceLocator.uploadQueueEngine(app)
+    private val signOutPrompt = MutableStateFlow<SignOutPrompt?>(null)
+
+    /** The inspector who signed in while some of their uploads were held: Home shows the banner for them. */
+    private val earlierFor = MutableStateFlow<String?>(null)
 
     /** Last username, to pre-fill the sign-in form (not secret). */
     val lastUsername: String get() = auth.lastUsername
 
-    val state: StateFlow<AppUiState> = combine(store.settings, connection, auth.session, signIn, auth.expired) { s, c, session, p, expired ->
+    private val base = combine(store.settings, connection, auth.session, signIn, auth.expired) { s, c, session, p, expired ->
         AppUiState(settings = s, connection = c, user = session?.user, signIn = p, sessionExpired = expired)
+    }
+
+    val state: StateFlow<AppUiState> = combine(base, queue.items, signOutPrompt, earlierFor) { b, items, prompt, earlier ->
+        val u = b.user?.username
+        b.copy(
+            queue = items,
+            signOutPrompt = if (u != null) prompt else null,
+            earlierUploads = if (u != null && earlier == u) QueueRules.waitingFor(items, u).size else 0,
+        )
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
         // The stored session is read synchronously, so the first frame already knows whether to show sign-in.
-        AppUiState(user = auth.session.value?.user, sessionExpired = auth.expired.value),
+        AppUiState(user = auth.session.value?.user, sessionExpired = auth.expired.value, queue = queue.snapshot()),
     )
 
     init {
@@ -125,6 +151,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val base = store.settings.first().serverUrl
             when (val r = api.login(base, username, password, auth.deviceId)) {
                 is ApiResult.Ok -> {
+                    // Uploads this inspector left behind are held until now: say so on Home; the queue sends them (spec §2).
+                    earlierFor.value = r.value.user.username.takeIf { QueueRules.waitingFor(queue.snapshot(), it).isNotEmpty() }
+                    signOutPrompt.value = null
                     auth.save(Session(r.value.token, r.value.user))
                     signIn.value = SignInProgress()
                     refreshCodeLists()
@@ -136,13 +165,68 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearSignInError() = signIn.update { it.copy(error = null) }
 
-    /** Settings → Sign out. Forgets the token first, then tells the server (best effort). Queued work is kept. */
-    fun signOut() {
+    /**
+     * Settings → Sign out. With nothing waiting it signs out at once; with uploads waiting it asks first (spec §2):
+     * Send now / Sign out anyway.
+     */
+    fun requestSignOut() {
         val session = auth.session.value ?: return
+        val prompt = SignOutRules.begin(queue.snapshot(), session.user.username, offline = connection.value is Connection.Error)
+        if (prompt == null) signOut() else signOutPrompt.value = prompt
+    }
+
+    /** Send now (also "Try again"): sends this inspector's uploads, then signs out; offline or a problem → the prompt says so. */
+    fun sendBeforeSignOut() {
+        val session = auth.session.value ?: return
+        val username = session.user.username
+        if (signOutPrompt.value is SignOutPrompt.Sending) return
+        val before = queue.snapshot()
+        signOutPrompt.value = SignOutPrompt.Sending(QueueRules.waitingFor(before, username).size)
+        viewModelScope.launch {
+            runCatching { engine.drain(force = true) }
+            if (auth.session.value?.token != session.token) { signOutPrompt.value = null; return@launch } // signed out meanwhile (401)
+            val next = SignOutRules.afterSend(before, queue.snapshot(), username)
+            if (next == null) { signOutPrompt.value = null; signOut() } else signOutPrompt.value = next
+        }
+    }
+
+    /** Sign out anyway: the uploads stay on the tablet, held until the same inspector signs in again. */
+    fun signOutAnyway() {
+        signOutPrompt.value = null
+        signOut()
+    }
+
+    /** Stay signed in (not while it is sending). */
+    fun dismissSignOutPrompt() {
+        if (signOutPrompt.value !is SignOutPrompt.Sending) signOutPrompt.value = null
+    }
+
+    /** Forgets the token first, then tells the server (best effort). Queued work is kept (decision 2026-11-18). */
+    private fun signOut() {
+        val session = auth.session.value ?: return
+        earlierFor.value = null
         auth.clear()
         viewModelScope.launch {
             api.logout(store.settings.first().serverUrl, session.token)
         }
+    }
+
+    fun dismissEarlierUploads() { earlierFor.value = null }
+
+    /** Settings → Upload queue → Retry now. Only the signed-in inspector's own items; never anyone else's. */
+    fun retryQueueItem(id: String) {
+        val username = auth.session.value?.user?.username ?: return
+        val item = queue.get(id) ?: return
+        if (!QueueItemRules.canRetry(item, username)) return
+        queue.modify(id) { QueueItemRules.forRetry(it) }
+        viewModelScope.launch { runCatching { engine.drain(force = true, onlyId = id) } }
+    }
+
+    /** Settings → Upload queue → Cancel (after the confirmation). Findings and photos stay on the tablet. */
+    fun cancelQueueItem(id: String) {
+        val username = auth.session.value?.user?.username ?: return
+        val item = queue.get(id) ?: return
+        if (QueueItemRules.canCancel(item, username)) queue.remove(id)
     }
 
     /** Saves the server address and tests it. Returns an error message if the text isn't a usable address. */

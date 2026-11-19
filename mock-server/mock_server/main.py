@@ -1010,6 +1010,23 @@ async def mock_lock(rma_id: str, request: Request):
     return {"ok": True, "lock": rma["lock"]}
 
 
+@api.post("/_mock/rmas/{rma_id}/lock-check")
+async def mock_lock_check(rma_id: str, request: Request):
+    """Make the lock check fail (503 LOCK_CHECK_FAILED, which the tablet queues) or work again. Body: {"fails": bool}."""
+    body = await request.json()
+    rma = get_rma(rma_id)
+    rma["lock_check_fails"] = bool(body.get("fails"))
+    return {"ok": True, "lock_check_fails": rma["lock_check_fails"]}
+
+
+@api.get("/_mock/rmas/{rma_id}/state")
+def mock_rma_state(rma_id: str):
+    """What the server holds now (tests only): status and parts count, so a test can tell whether an upload arrived."""
+    rma = get_rma(rma_id)
+    return {"rma_id": rma["rma_id"], "status": rma["header"]["inspection_status"], "parts": len(rma["parts"]),
+            "lock_check_fails": rma["lock_check_fails"]}
+
+
 @api.post("/_mock/rmas/{rma_id}/report-in-use")
 async def mock_report_in_use(rma_id: str, request: Request):
     body = await request.json()

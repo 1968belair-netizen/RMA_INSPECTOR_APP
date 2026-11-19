@@ -169,8 +169,11 @@ object QueueRules {
     /** The codes that must never be retried automatically and are handled in the conflict screen (B4b). */
     fun isConflict(code: String?): Boolean = code == "RMA_CHANGED" || code == "REPORT_PICS_CHANGED"
 
+    /** The reason text of an item that waits because the server can't be reached (the sign-out prompt looks for it). */
+    const val OFFLINE_REASON = "Can't reach the server."
+
     fun reasonFor(f: ApiResult.Failure): String = when {
-        f.kind == ApiResult.Kind.UNREACHABLE -> "Can't reach the server."
+        f.kind == ApiResult.Kind.UNREACHABLE -> OFFLINE_REASON
         isConflict(f.code) -> "Changed elsewhere. Review it before sending."
         f.code == "RMA_NOT_OPEN" -> "RMA is closed. Ask the RMA team."
         f.httpStatus == 423 || f.code == "RMA_LOCKED" -> "Open in Macola. Will retry."
