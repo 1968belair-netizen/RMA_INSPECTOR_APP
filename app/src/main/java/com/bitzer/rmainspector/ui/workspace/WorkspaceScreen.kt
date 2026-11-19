@@ -56,6 +56,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -336,7 +339,13 @@ private fun Workspace(state: WorkspaceState, rma: RmaDetail, refreshing: Boolean
 
     Column(Modifier.fillMaxSize()) {
         if (refreshing) LinearProgressIndicator(Modifier.fillMaxWidth()) else Spacer(Modifier.heightIn(min = 4.dp))
-        WorkspaceHeader(rma, state.failureExpanded, state.guided, wide = twoPane, cb)
+        if (state.tab == WorkspaceTab.REPORT) {
+            // Slim one-line header with Details (issue #81); Findings and Photos keep the full header.
+            var detailsOpen by rememberSaveable { mutableStateOf(false) }
+            ReportHeaderContent(reportHeaderState(rma, detailsOpen, state.guided), ReportHeaderCallbacks({ detailsOpen = !detailsOpen }, cb.onGuided))
+        } else {
+            WorkspaceHeader(rma, state.failureExpanded, state.guided, wide = twoPane, cb)
+        }
         val banners = state.banners
         if (banners.isNotEmpty()) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -388,7 +397,7 @@ private fun HeaderField(label: String, value: String) {
 }
 
 @Composable
-private fun GuidedButtonView(guided: GuidedButton, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun GuidedButtonView(guided: GuidedButton, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val enabled = guided !is GuidedButton.Unavailable && guided !is GuidedButton.Complete
     Button(
         onClick = onClick,
