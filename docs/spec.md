@@ -248,8 +248,8 @@ The tablet **never** silently overwrites and never retries a `409 RMA_CHANGED` o
   - **Right (50 %):** **General Defect Code** dropdown; **report summary** (standard-wording button, character
     counter, 4000 max); **Inspected by / Summary by** (initials pre-filled, editable); **"Report photos: n picked,
     n pages" → Arrange** (edit captions, caption order = report order); **Submit report**.
-- **Must stay usable with the on-screen keyboard open** — the summary box and Submit stay visible (the viewer
-  collapses and the form takes the full width; the form scrolls).
+- **Must stay usable with the on-screen keyboard open** — the summary box and Submit stay visible (landscape: the viewer stays beside the form and the form scrolls;
+  portrait: the viewer collapses).
 - **Portrait (or narrow window):** stacked — a collapsible **PHOTOS** section (the viewer) above the form.
 - Report photos are copies in `Report Pics ` (any number; ~20 typical); captions = filenames (§9).
 - **Submit report** → §6.2.

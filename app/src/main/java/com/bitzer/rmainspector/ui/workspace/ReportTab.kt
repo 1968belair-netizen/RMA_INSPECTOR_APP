@@ -105,13 +105,13 @@ fun ReportTab(rows: List<FindingRow>, selection: String?, report: ReportState, r
                 when {
                     report.arrange -> ArrangeScreen(report, readOnly, cb)
                     twoPane -> Row(Modifier.fillMaxSize()) {
-                        if (!keyboard) {
+                        run {
                             Box(Modifier.weight(0.5f).fillMaxHeight()) {
                                 ReportPhotoViewerContent(report.viewerState(), cb.viewerCallbacks())
                             }
                             VerticalDivider(color = BitzerColors.Grey30)
                         }
-                        Box(Modifier.weight(if (keyboard) 1f else 0.5f).fillMaxHeight().testTag(WorkspaceTags.detailPane(WorkspaceTab.REPORT))) {
+                        Box(Modifier.weight(0.5f).fillMaxHeight().testTag(WorkspaceTags.detailPane(WorkspaceTab.REPORT))) {
                             ReportRight(report, readOnly, cb)
                         }
                     }
