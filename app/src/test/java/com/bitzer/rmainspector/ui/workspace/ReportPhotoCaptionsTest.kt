@@ -109,7 +109,7 @@ class ReportPhotoCaptionsTest {
         assertTrue(ReportPhotoCaptions.viewerPhotos(all, emptyList(), reportOnly = true).isEmpty())
     }
 
-    @Test fun samePhotoInBothFoldersIsKeptSeparately() {
+    @Test fun duplicatePicksShowOnce() {
         val v = ReportPhotoCaptions.viewerPhotos(all, listOf(
             ReportPick("all_pics", "00-1 As received.jpg", "00-1 As received"),
             ReportPick("all_pics", "00-1 As received.jpg", "00-1 As received"),
