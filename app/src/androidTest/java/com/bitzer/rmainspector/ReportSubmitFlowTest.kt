@@ -87,7 +87,7 @@ class ReportSubmitFlowTest {
         compose.onNodeWithTag(ReportSubmitTags.DONE).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilDoesNotExist(hasTestTag(ReportSubmitTags.PREVIEW), timeoutMillis = 10_000)
         // First build set Report Complete; the workspace reloaded and the header shows it.
-        compose.waitUntilAtLeastOneExists(hasText("Report Complete", substring = true), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("Report Complete", substring = true, ignoreCase = true), timeoutMillis = 15_000)
     }
 
     /** Second submit on the same RMA: "Report already complete" first; after Update report the status stays. */
@@ -96,13 +96,13 @@ class ReportSubmitFlowTest {
         signInAndOpenReportTab("912347")
         clickSubmit()
         waitForPreviewAndDone()
-        compose.waitUntilAtLeastOneExists(hasText("Report Complete", substring = true), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("Report Complete", substring = true, ignoreCase = true), timeoutMillis = 15_000)
 
         clickSubmit()
         compose.waitUntilAtLeastOneExists(hasTestTag(ReportSubmitTags.CONFIRM) and hasText(ReportSubmitRules.COMPLETE_NOTE), timeoutMillis = 15_000)
         compose.onNode(hasText("Update report") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
         waitForPreviewAndDone()
-        compose.waitUntilAtLeastOneExists(hasText("Report Complete", substring = true), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText("Report Complete", substring = true, ignoreCase = true), timeoutMillis = 15_000)
         compose.onAllNodes(hasText("Sent to RSM", substring = true)).assertCountEquals(0)
     }
 

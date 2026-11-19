@@ -131,7 +131,7 @@ the header. The **guided inspection button** is in the header (§5).
 - Button: **Submit inspection** (§6).
 
 ### 4.5 Report tab
-See §7.
+See §7: slim header, photo viewer left / report form right (stacked in portrait). The parts list is no longer on this tab (Findings tab).
 
 ---
 
@@ -239,15 +239,18 @@ The tablet **never** silently overwrites and never retries a `409 RMA_CHANGED` o
 
 ## 7. Report tab
 
-- **Landscape layout:**
-  - **Left:** parts list (part, issue, note) and a **photo strip filtered by the selected part** — "Show all"
-    toggle, tap to enlarge, **long-press to add to the report**.
-  - **Right:** **General Defect Code** dropdown; **report summary** (standard-wording button, character counter);
-    **Inspected by / Summary by** (initials pre-filled, editable); **"Report photos: n picked, n pages" → Arrange**
-    (edit captions, caption order = report order).
-- **Must stay usable with the on-screen keyboard open** — the summary box and Submit stay visible (panes resize,
-  left pane collapses if needed).
-- Portrait: the left pane becomes a collapsible section above the right pane.
+- **Header:** the slim one-line header (RMA, customer, model, serial, return code, failure, status chip + **Details**
+  and "+n" for fields that did not fit); the full header lives in Details. Findings and Photos keep the full header.
+- **Landscape layout (width check, not the list-detail scaffold):**
+  - **Left (50 %):** the **photo viewer** — All photos / Report photos toggle, large photo (swipe, arrows, zoom),
+    counter, caption chips and a **filmstrip**. Read-only: picking report photos is done on the Photos tab
+    (long-press), not here.
+  - **Right (50 %):** **General Defect Code** dropdown; **report summary** (standard-wording button, character
+    counter, 4000 max); **Inspected by / Summary by** (initials pre-filled, editable); **"Report photos: n picked,
+    n pages" → Arrange** (edit captions, caption order = report order); **Submit report**.
+- **Must stay usable with the on-screen keyboard open** — the summary box and Submit stay visible (landscape: the viewer stays beside the form and the form scrolls;
+  portrait: the viewer collapses).
+- **Portrait (or narrow window):** stacked — a collapsible **PHOTOS** section (the viewer) above the form.
 - Report photos are copies in `Report Pics ` (any number; ~20 typical); captions = filenames (§9).
 - **Submit report** → §6.2.
 

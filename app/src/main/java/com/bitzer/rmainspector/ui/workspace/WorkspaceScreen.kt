@@ -217,6 +217,8 @@ fun WorkspaceScreen(
                 onTogglePartsExpanded = reportVm::togglePartsExpanded,
                 onDismissMessage = reportVm::dismissMessage,
                 onRetryPhotos = reportVm::loadPhotos,
+                onViewerSelect = reportVm::viewerSelect,
+                onViewerReportOnly = reportVm::setViewerReportOnly,
                 onSubmitReport = {
                     rma?.let { submitVm.begin(it, report.draft, report.lists.summaryBlocks.associate { b -> b.blockId to b.label }, base.findings.hasDraft) }
                 },

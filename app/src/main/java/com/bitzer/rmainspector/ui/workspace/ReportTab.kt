@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -82,38 +83,39 @@ object ReportTags {
     const val ARRANGE = "report_arrange_button"
     const val SAVE_PICS = "report_save_pics"
     const val CONFLICT = "report_conflict"
+    const val VIEWER_TOGGLE = "report_viewer_toggle"
 }
 
-/** Window height of the tab body below which the on-screen keyboard is assumed open (panes then collapse). */
-private val KEYBOARD_BODY_HEIGHT = 300.dp
-
 /**
- * Report tab (spec §7). Landscape: parts list + photo strip on the left, form on the right. Portrait: the left
- * pane is a collapsible section above the form. With the on-screen keyboard open the left pane collapses so the
- * summary box stays visible.
+ * Report tab (spec §7). Landscape: photo viewer + filmstrip on the left, report form on the right. Portrait: the
+ * viewer is a collapsible section above the form. With the on-screen keyboard open the viewer collapses so the
+ * summary box stays visible. [rows], [selection] and [onSelect] are kept for the shared call site; the Report tab no
+ * longer shows the parts list.
  */
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReportTab(rows: List<FindingRow>, selection: String?, report: ReportState, readOnly: Boolean, twoPane: Boolean, cb: ReportCallbacks,
               onSelect: (String?) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().testTag(WorkspaceTags.listPane(WorkspaceTab.REPORT))) {
-        val keyboard = report.keyboardOpen ?: (WindowInsets.isImeVisible || maxHeight < KEYBOARD_BODY_HEIGHT)
+        val keyboard = report.keyboardOpen ?: WindowInsets.isImeVisible
+        val bodyHeight = maxHeight
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     report.arrange -> ArrangeScreen(report, readOnly, cb)
                     twoPane -> Row(Modifier.fillMaxSize()) {
-                        if (!keyboard) {
-                            Box(Modifier.weight(0.42f).fillMaxHeight()) {
-                                ReportLeft(rows, selection, report, cb, onSelect)
+                        run {
+                            Box(Modifier.weight(0.5f).fillMaxHeight()) {
+                                ReportPhotoViewerContent(report.viewerState(), cb.viewerCallbacks())
                             }
                             VerticalDivider(color = BitzerColors.Grey30)
                         }
-                        Box(Modifier.weight(if (keyboard) 1f else 0.58f).fillMaxHeight().testTag(WorkspaceTags.detailPane(WorkspaceTab.REPORT))) {
+                        Box(Modifier.weight(0.5f).fillMaxHeight().testTag(WorkspaceTags.detailPane(WorkspaceTab.REPORT))) {
                             ReportRight(report, readOnly, cb)
                         }
                     }
-                    else -> PortraitReport(rows, selection, report, readOnly, keyboard, cb, onSelect)
+                    else -> PortraitReport(report, readOnly, keyboard, bodyHeight, cb)
                 }
             }
             if (report.keyboardOpen == true) SimulatedKeyboard()
@@ -123,132 +125,12 @@ fun ReportTab(rows: List<FindingRow>, selection: String?, report: ReportState, r
     }
 }
 
+
 /** Stand-in for the soft keyboard in screenshot tests (the real one resizes the window). */
 @Composable
 private fun SimulatedKeyboard() {
     Box(Modifier.fillMaxWidth().height(260.dp).background(BitzerColors.Grey30), contentAlignment = Alignment.Center) {
         Text("On-screen keyboard (simulated)", style = MaterialTheme.typography.bodyMedium, color = BitzerColors.Grey90)
-    }
-}
-
-// ----------------------------------------------------------------------------------------------- Left
-
-@Composable
-private fun ReportLeft(rows: List<FindingRow>, selection: String?, report: ReportState, cb: ReportCallbacks, onSelect: (String?) -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f)) {
-            ReportTitle("Parts", "${rows.size} row${if (rows.size == 1) "" else "s"}")
-            if (rows.isEmpty()) {
-                Text("No parts recorded yet.", style = MaterialTheme.typography.bodyLarge, color = BitzerColors.Grey60, modifier = Modifier.padding(16.dp))
-            } else {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    itemsIndexed(rows, key = { _, r -> r.localId }) { i, row ->
-                        ReportPartRow(i, row, selected = row.localId == selection) { onSelect(if (row.localId == selection) null else row.localId) }
-                    }
-                }
-            }
-        }
-        HorizontalDivider(color = BitzerColors.Grey30)
-        PhotoStrip(rows, selection, report, cb)
-    }
-}
-
-@Composable
-private fun ReportPartRow(index: Int, row: FindingRow, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp)
-            .background(if (selected) BitzerColors.Green10 else BitzerColors.White)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text((index + 1).toString().padStart(2, '0'), style = MaterialTheme.typography.bodyLarge, color = BitzerColors.Grey60,
-            modifier = Modifier.width(36.dp))
-        Column(Modifier.weight(1f)) {
-            Text("${row.partCode?.label ?: "Part not set"}  ·  ${row.issueCode?.label ?: "Issue not set"}", style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-            if (row.note.isNotBlank()) Text(row.note, style = MaterialTheme.typography.bodyMedium, color = BitzerColors.Grey90, maxLines = 2,
-                overflow = TextOverflow.Ellipsis)
-        }
-    }
-    HorizontalDivider(color = BitzerColors.Grey10)
-}
-
-/** Photos of the selected part (or all), tap = enlarge, long-press = add to / remove from the report. */
-@Composable
-private fun PhotoStrip(rows: List<FindingRow>, selection: String?, report: ReportState, cb: ReportCallbacks) {
-    val row = rows.firstOrNull { it.localId == selection }
-    val position = if (row == null) 0 else rows.indexOf(row) + 1
-    val filtered = if (report.showAll || row == null) report.photos else photosForPart(report.photos, row, position)
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("PHOTOS", style = MaterialTheme.typography.titleSmall, color = BitzerColors.DarkGreen)
-                Text(
-                    when {
-                        row == null || report.showAll -> "All ${report.photos.size}"
-                        else -> "${filtered.size} for ${row.partCode?.let { "${it.code} ${it.description}" } ?: "this part"}".trim()
-                    },
-                    style = MaterialTheme.typography.bodySmall, color = BitzerColors.Grey60, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
-            FilterChip(
-                selected = report.showAll, onClick = cb.onToggleShowAll,
-                label = { Text("Show all") }, modifier = Modifier.heightIn(min = 48.dp),
-            )
-        }
-        Text("Tap to enlarge · long-press to add to the report", style = MaterialTheme.typography.bodySmall, color = BitzerColors.Grey60,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-        when (val load = report.photosLoad) {
-            ReportPhotosLoad.Loading -> Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                Text("  Loading photos…", style = MaterialTheme.typography.bodyMedium)
-            }
-            is ReportPhotosLoad.Error -> Column(Modifier.padding(horizontal = 16.dp)) {
-                Text(load.message, style = MaterialTheme.typography.bodyMedium, color = BitzerColors.Error)
-                TextButton(onClick = cb.onRetryPhotos, modifier = Modifier.heightIn(min = 56.dp)) { Text("Retry") }
-            }
-            ReportPhotosLoad.Loaded -> if (filtered.isEmpty()) {
-                Text(
-                    if (report.photos.isEmpty()) "No photos for this RMA yet." else "No photos for this part yet — tap Show all.",
-                    style = MaterialTheme.typography.bodyLarge, color = BitzerColors.Grey60, modifier = Modifier.padding(16.dp),
-                )
-            } else {
-                LazyRow(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(filtered, key = { it.filename }) { p ->
-                        PhotoTile(p, picked = report.draft.isPicked(p.filename), cb)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun PhotoTile(photo: PhotoEntry, picked: Boolean, cb: ReportCallbacks) {
-    Column(
-        Modifier.width(148.dp)
-            .combinedClickable(
-                role = Role.Button,
-                onClickLabel = "Enlarge",
-                onLongClickLabel = if (picked) "Remove from report" else "Add to report",
-                onClick = { cb.onEnlarge(photo.filename) },
-                onLongClick = { cb.onTogglePick(photo.filename) },
-            ),
-    ) {
-        Box {
-            PhotoImage("all", photo.filename, thumb = true, cb, Modifier.fillMaxWidth().height(104.dp))
-            if (picked) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = "In the report", tint = BitzerColors.Green,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(28.dp).background(BitzerColors.White, RoundedCornerShape(14.dp)))
-            }
-        }
-        Text(photo.filename.removeSuffix(".jpg"), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -367,27 +249,31 @@ private fun ReportPhotosCard(report: ReportState, readOnly: Boolean, cb: ReportC
 
 // ---------------------------------------------------------------------------------------------- Portrait
 
+/** Stacked layout: collapsible photo viewer above the form (the form scrolls; Submit stays reachable above the keyboard). */
 @Composable
-private fun PortraitReport(rows: List<FindingRow>, selection: String?, report: ReportState, readOnly: Boolean, keyboard: Boolean,
-                           cb: ReportCallbacks, onSelect: (String?) -> Unit) {
+private fun PortraitReport(report: ReportState, readOnly: Boolean, keyboard: Boolean, bodyHeight: Dp, cb: ReportCallbacks) {
     val expanded = report.partsExpanded && !keyboard
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).background(BitzerColors.Grey10)
-                .clickable(role = Role.Button, onClickLabel = if (expanded) "Hide parts and photos" else "Show parts and photos", onClick = cb.onTogglePartsExpanded)
+                .clickable(role = Role.Button, onClickLabel = if (expanded) "Hide photos" else "Show photos", onClick = cb.onTogglePartsExpanded)
+                .testTag(ReportTags.VIEWER_TOGGLE)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("PARTS AND PHOTOS", style = MaterialTheme.typography.titleSmall, color = BitzerColors.DarkGreen, modifier = Modifier.weight(1f))
+            Text("PHOTOS", style = MaterialTheme.typography.titleSmall, color = BitzerColors.DarkGreen, modifier = Modifier.weight(1f))
             Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null, tint = BitzerColors.DarkGreen)
         }
         if (expanded) {
-            Box(Modifier.fillMaxWidth().weight(1f)) { ReportLeft(rows, selection, report, cb, onSelect) }
+            Box(Modifier.fillMaxWidth().height((bodyHeight * 0.5f).coerceIn(320.dp, 480.dp))) {
+                ReportPhotoViewerContent(report.viewerState(), cb.viewerCallbacks())
+            }
             HorizontalDivider(color = BitzerColors.Grey30)
         }
         Box(Modifier.fillMaxWidth().weight(1f)) { ReportRight(report, readOnly, cb) }
     }
 }
+
 
 // ----------------------------------------------------------------------------------------- Enlarged photo
 
@@ -493,7 +379,7 @@ private fun ArrangeScreen(report: ReportState, readOnly: Boolean, cb: ReportCall
             }
         }
         if (d.picks.isEmpty()) {
-            Text("No photos picked yet. Long-press a photo on the Report tab to add it to the report.",
+            Text("No photos picked yet. Long-press a photo on the Photos tab to add it to the report.",
                 style = MaterialTheme.typography.bodyLarge, color = BitzerColors.Grey60, modifier = Modifier.padding(24.dp))
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
@@ -529,12 +415,4 @@ private fun ArrangeRow(index: Int, position: Int, source: String, filename: Stri
         }
     }
     HorizontalDivider(color = BitzerColors.Grey10)
-}
-
-@Composable
-private fun ReportTitle(title: String, note: String?) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.Bottom) {
-        Text(title.uppercase(), style = MaterialTheme.typography.titleSmall, color = BitzerColors.DarkGreen)
-        if (note != null) Text("   $note", style = MaterialTheme.typography.bodySmall, color = BitzerColors.Grey60)
-    }
 }
