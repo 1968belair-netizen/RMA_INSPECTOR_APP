@@ -79,7 +79,9 @@ class ReportLayoutFlowTest {
         try {
             compose.waitUntilAtLeastOneExists(hasText("1 / 3"), timeoutMillis = 30_000)
         } catch (e: Throwable) {
-            throw AssertionError("viewer counter missing; tree: " + compose.onRoot().printToString(maxDepth = 12).replace("\n", " | ").take(6000), e)
+            throw AssertionError("viewer counter missing; tree: " + compose.onRoot(useUnmergedTree = true).printToString(maxDepth = 60).lines()
+                .filter { it.contains("Text = ") || it.contains("TestTag") || it.contains("ContentDescription") }
+                .joinToString(" | ") { it.trim().take(90) }.take(5000), e)
         }
         compose.waitUntilAtLeastOneExists(hasTestTag(ReportTags.SUMMARY), timeoutMillis = 15_000)
 
