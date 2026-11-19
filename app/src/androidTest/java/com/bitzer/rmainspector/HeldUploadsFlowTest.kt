@@ -95,7 +95,9 @@ class HeldUploadsFlowTest {
         val id = queue.snapshot().single().id
         assertEquals("demo", queue.snapshot().single().inspector.username)
 
-        // --- A signs out: the prompt asks; Sign out anyway keeps the upload.
+        // --- A signs out (Home → Settings): the prompt asks; Sign out anyway keeps the upload.
+        back()
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 15_000)
         openSettings()
         compose.onNode(hasText("Sign out", substring = true) and hasClickAction()).performScrollTo().performClick()
         compose.waitUntilAtLeastOneExists(hasTestTag(QueueTags.SIGN_OUT_PROMPT), timeoutMillis = 10_000)
@@ -150,6 +152,9 @@ class HeldUploadsFlowTest {
         compose.onNodeWithTag(SignInTags.SUBMIT).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 30_000)
     }
+
+    /** App-level back (Espresso's pressBack waits for window focus, which the keyboard can hold on CI emulators). */
+    private fun back() = compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
 
     private fun openSettings() {
         compose.onAllNodes(hasContentDescription("Settings") and hasClickAction()).onFirst().performClick()

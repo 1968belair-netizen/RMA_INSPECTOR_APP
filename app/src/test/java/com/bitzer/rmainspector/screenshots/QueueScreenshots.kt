@@ -55,6 +55,7 @@ abstract class QueueCatalog(private val device: String) {
         item("q5", "912360", who = other),
     )
 
+    @Composable
     private fun settings(app: AppUiState) =
         SettingsScreen(app, onBack = {}, onSaveServer = { null }, onResetServer = {}, onTest = {}, onSignOut = {}, now = 1_000_000L)
 
