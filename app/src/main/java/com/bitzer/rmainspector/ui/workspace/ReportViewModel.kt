@@ -47,8 +47,9 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
     private val drafts = ServiceLocator.reportDrafts(app)
     private val auth = ServiceLocator.auth(app)
     private val queue = ServiceLocator.uploadQueue(app)
+    private val viewerPrefs = app.getSharedPreferences("report_photo_viewer", android.content.Context.MODE_PRIVATE)
 
-    private val _state = MutableStateFlow(ReportState())
+    private val _state = MutableStateFlow(ReportState(viewerReportOnly = viewerPrefs.getBoolean("report_only_${rmaId}", false)))
     val state: StateFlow<ReportState> = _state.asStateFlow()
 
     private var rma: RmaDetail? = null
@@ -138,6 +139,14 @@ class ReportViewModel(app: Application, saved: SavedStateHandle) : AndroidViewMo
 
     /** The submit flow changed the draft (fixed spelling, saved photos): take it over. */
     fun applyDraft(d: ReportDraft) = edit { d }
+
+    /** Photo viewer (#82): All / Report photos toggle, remembered per RMA on this tablet. */
+    fun setViewerReportOnly(reportOnly: Boolean) {
+        viewerPrefs.edit().putBoolean("report_only_${rmaId}", reportOnly).apply()
+        _state.update { it.copy(viewerReportOnly = reportOnly) }
+    }
+
+    fun viewerSelect(key: String) = _state.update { if (it.viewerSelected == key) it else it.copy(viewerSelected = key) }
 
     fun toggleShowAll() = _state.update { it.copy(showAll = !it.showAll) }
     fun enlarge(filename: String?) = _state.update { it.copy(enlarged = filename) }

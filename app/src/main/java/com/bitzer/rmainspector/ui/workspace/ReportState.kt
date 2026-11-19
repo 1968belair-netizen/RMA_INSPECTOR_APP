@@ -52,6 +52,9 @@ data class ReportState(
     val message: ReportMessage? = null,
     val conflict: ReportPicsConflict? = null,
     val keyboardOpen: Boolean? = null,
+    /** Photo viewer (#82): "Report photos" set instead of all photos (remembered per RMA) and the photo it shows. */
+    val viewerReportOnly: Boolean = false,
+    val viewerSelected: String? = null,
 ) {
     val pickedCount: Int get() = draft.picks.size
     val pageCount: Int get() = ReportDraft.pageCount(pickedCount, lists.settings)
@@ -78,6 +81,9 @@ data class ReportCallbacks(
     val onTogglePartsExpanded: () -> Unit = {},
     val onDismissMessage: () -> Unit = {},
     val onRetryPhotos: () -> Unit = {},
+    /** Photo viewer (#82): the shown photo changed / the All-Report toggle was set. */
+    val onViewerSelect: (key: String) -> Unit = {},
+    val onViewerReportOnly: (Boolean) -> Unit = {},
     /** "Submit report" (C2): spell check, build, preview. */
     val onSubmitReport: () -> Unit = {},
     /** Loads a photo as an image (`folder` = `all` / `report`); null = not available (placeholder tile). */
