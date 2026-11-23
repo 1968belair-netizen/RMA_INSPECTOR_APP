@@ -38,6 +38,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -93,7 +95,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * What the Report-tab photo viewer shows (issue #82). Read-only: picking report photos stays on the Photos tab.
+ * What the Report-tab photo viewer shows (issue #82). Report photos are picked here (#90): an "Add to report" /
+ * "Remove from report" button for the shown photo, only when [canPick] (report editable).
  * - [photos]: `All Pics` as the server listed them; [picks]: the report photos (`Report Pics ` set).
  * - [reportOnly]: false = "All photos" (default), true = "Report photos". Remembered per RMA by the view model.
  * - [selected]: [ViewerPhoto.key] of the photo to show; null = the first one. Changing it moves the pager.
@@ -104,6 +107,7 @@ data class ReportPhotoViewerState(
     val reportOnly: Boolean = false,
     val selected: String? = null,
     val load: ReportPhotosLoad = ReportPhotosLoad.Loaded,
+    val canPick: Boolean = false,
 )
 
 /** Viewer actions; defaults do nothing so previews and screenshots can pass `ReportPhotoViewerCallbacks()`. */
@@ -112,6 +116,8 @@ data class ReportPhotoViewerCallbacks(
     val onSelect: (key: String) -> Unit = {},
     val onSetReportOnly: (Boolean) -> Unit = {},
     val onRetry: () -> Unit = {},
+    /** Add / remove the shown photo (its file name) from the report (#90). */
+    val onTogglePick: (filename: String) -> Unit = {},
     /** Same loader as the rest of the Report tab (`ReportCallbacks.loadImage`); null = placeholder. */
     val loadImage: suspend (folder: String, filename: String, thumb: Boolean) -> ImageBitmap? = { _, _, _ -> null },
 )
@@ -127,6 +133,7 @@ object ReportPhotoViewerTags {
     const val TOGGLE_ALL = "viewer_toggle_all"
     const val TOGGLE_REPORT = "viewer_toggle_report"
     const val EMPTY = "viewer_empty"
+    const val TOGGLE_PICK = "viewer_toggle_pick"
 }
 
 private const val MAX_ZOOM = 6f
@@ -248,6 +255,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.ViewerBody(
         ) {
             Text(ReportPhotoCaptions.counter(page, visible.size), color = Color.White, style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+        }
+        if (state.canPick) {
+            val isPicked = current.filename in picked
+            Button(
+                onClick = { latestCb.onTogglePick(current.filename) },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).heightIn(min = 56.dp)
+                    .testTag(ReportPhotoViewerTags.TOGGLE_PICK),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isPicked) BitzerColors.Grey90 else BitzerColors.Green),
+            ) { Text(if (isPicked) "Remove from report" else "Add to report") }
         }
         ArrowButton(left = true, enabled = page > 0, modifier = Modifier.align(Alignment.CenterStart).padding(8.dp)) { go(-1) }
         ArrowButton(left = false, enabled = page < visible.lastIndex, modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp)) { go(1) }
@@ -441,10 +457,11 @@ private fun ViewerImage(photo: ViewerPhoto, thumbOnly: Boolean, cb: ReportPhotoV
 }
 
 /** The viewer's state from the Report tab's state (used by the layout issue; the viewer itself stays stateless). */
-fun ReportState.viewerState() = ReportPhotoViewerState(
+fun ReportState.viewerState(readOnly: Boolean = true) = ReportPhotoViewerState(
     photos = photos, picks = draft.picks, reportOnly = viewerReportOnly, selected = viewerSelected, load = photosLoad,
+    canPick = !readOnly,
 )
 
 fun ReportCallbacks.viewerCallbacks() = ReportPhotoViewerCallbacks(
-    onSelect = onViewerSelect, onSetReportOnly = onViewerReportOnly, onRetry = onRetryPhotos, loadImage = loadImage,
+    onSelect = onViewerSelect, onSetReportOnly = onViewerReportOnly, onRetry = onRetryPhotos, onTogglePick = onTogglePick, loadImage = loadImage,
 )

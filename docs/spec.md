@@ -243,8 +243,10 @@ The tablet **never** silently overwrites and never retries a `409 RMA_CHANGED` o
   and "+n" for fields that did not fit); the full header lives in Details. Findings and Photos keep the full header.
 - **Landscape layout (width check, not the list-detail scaffold):**
   - **Left (50 %):** the **photo viewer** — All photos / Report photos toggle, large photo (swipe, arrows, zoom),
-    counter, caption chips and a **filmstrip**. Read-only: picking report photos is done on the Photos tab
-    (long-press), not here.
+    counter, caption chips and a **filmstrip** (a check marks photos in the report). Report photos are picked
+    here: the **Add to report / Remove from report** button (min 56 dp) acts on the shown photo and updates the
+    filmstrip check and "Report photos: n picked" at once; hidden when the report is read-only. The Photos tab has no
+    pick action.
   - **Right (50 %):** **General Defect Code** dropdown; **report summary** (standard-wording button, character
     counter, 4000 max); **Inspected by / Summary by** (initials pre-filled, editable); **"Report photos: n picked,
     n pages" → Arrange** (edit captions, caption order = report order); **Submit report**.

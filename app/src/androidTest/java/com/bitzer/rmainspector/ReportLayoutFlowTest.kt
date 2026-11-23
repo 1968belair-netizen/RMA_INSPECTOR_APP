@@ -108,6 +108,40 @@ class ReportLayoutFlowTest {
         compose.waitUntilDoesNotExist(hasText("Credit status", ignoreCase = true), timeoutMillis = 15_000)
     }
 
+    /** Issue #90: add / remove the shown photo from the report in the viewer; the picked count follows. */
+    @Test
+    fun pickPhotoInViewer() {
+        compose.waitUntilAtLeastOneExists(hasText("SIGN IN"), timeoutMillis = 15_000)
+        compose.onNodeWithTag(SignInTags.USERNAME).performTextReplacement("demo")
+        compose.onNodeWithTag(SignInTags.PASSWORD).performTextReplacement("demo")
+        compose.waitUntilAtLeastOneExists(hasTestTag(SignInTags.SUBMIT) and isEnabled(), timeoutMillis = 15_000)
+        compose.onNodeWithTag(SignInTags.SUBMIT).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasText("FIND AN RMA"), timeoutMillis = 30_000)
+        compose.onNode(hasSetTextAction()).performTextInput("912347")
+        compose.onNode(hasText("Search", substring = true) and hasClickAction()).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("FAILURE INFO"), timeoutMillis = 15_000)
+        compose.onNodeWithTag(WorkspaceTags.tab(WorkspaceTab.REPORT)).performClick()
+        compose.runOnUiThread {
+            val w = compose.activity.window
+            WindowCompat.getInsetsController(w, w.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
+        compose.waitUntilAtLeastOneExists(hasText("1 / 3"), timeoutMillis = 30_000)
+        compose.waitUntilAtLeastOneExists(hasText("Report photos: 1 picked", substring = true), timeoutMillis = 15_000)
+
+        val toggle = hasTestTag(ReportPhotoViewerTags.TOGGLE_PICK) and hasClickAction()
+        compose.waitUntilAtLeastOneExists(toggle, timeoutMillis = 15_000)
+        val adding = compose.onAllNodes(hasText("Add to report") and toggle).fetchSemanticsNodes().isNotEmpty()
+        val after = if (adding) 2 else 0
+
+        compose.onNode(toggle).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasText("Report photos: $after picked", substring = true), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText(if (adding) "Remove from report" else "Add to report") and toggle, timeoutMillis = 15_000)
+
+        compose.onNode(toggle).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntilAtLeastOneExists(hasText("Report photos: 1 picked", substring = true), timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(hasText(if (adding) "Add to report" else "Remove from report") and toggle, timeoutMillis = 15_000)
+    }
+
     private fun mockReset() {
         val t = Thread {
             val c = URL(BuildConfig.DEFAULT_SERVER_URL.trimEnd('/') + "/_mock/reset").openConnection() as HttpURLConnection

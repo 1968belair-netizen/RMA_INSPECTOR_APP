@@ -107,7 +107,7 @@ fun ReportTab(rows: List<FindingRow>, selection: String?, report: ReportState, r
                     twoPane -> Row(Modifier.fillMaxSize()) {
                         run {
                             Box(Modifier.weight(0.5f).fillMaxHeight()) {
-                                ReportPhotoViewerContent(report.viewerState(), cb.viewerCallbacks())
+                                ReportPhotoViewerContent(report.viewerState(readOnly), cb.viewerCallbacks())
                             }
                             VerticalDivider(color = BitzerColors.Grey30)
                         }
@@ -266,7 +266,7 @@ private fun PortraitReport(report: ReportState, readOnly: Boolean, keyboard: Boo
         }
         if (expanded) {
             Box(Modifier.fillMaxWidth().height((bodyHeight * 0.5f).coerceIn(320.dp, 480.dp))) {
-                ReportPhotoViewerContent(report.viewerState(), cb.viewerCallbacks())
+                ReportPhotoViewerContent(report.viewerState(readOnly), cb.viewerCallbacks())
             }
             HorizontalDivider(color = BitzerColors.Grey30)
         }
