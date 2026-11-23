@@ -66,6 +66,12 @@ abstract class ReportPhotoViewerCatalog(private val device: String) {
     @Test fun viewer_with_photos() = shot("viewer_with_photos",
         ReportPhotoViewerState(photos, picks, selected = key("03-1 Piston assy, skirt - 34 Scored, Scratched")))
 
+    @Test fun viewer_pick_button_add() = shot("viewer_pick_button_add",
+        ReportPhotoViewerState(photos, picks, selected = key("01-1 Terminal box - 50 Normal"), canPick = true))
+
+    @Test fun viewer_pick_button_remove() = shot("viewer_pick_button_remove",
+        ReportPhotoViewerState(photos, picks, selected = key("03-1 Piston assy, skirt - 34 Scored, Scratched"), canPick = true))
+
     @Test fun viewer_rma_level_photo() = shot("viewer_rma_level_photo",
         ReportPhotoViewerState(photos, picks, selected = key("00-2 Nameplate")))
 

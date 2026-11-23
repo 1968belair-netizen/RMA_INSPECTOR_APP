@@ -50,8 +50,9 @@ Use **RMA 912361** (Recip, Received) for the main run. Button names are shown in
 7. **Report tab.** On a landscape tablet the photo viewer is on the left (swipe, arrows, filmstrip, All photos /
    Report photos toggle, pinch to zoom; each photo shows its part and issue code) and the report fields are on the
    right. The header is one line; tap **DETAILS** for the rest. Choose the defect code and edit the summary. To show
-   spell check, type a misspelling such as "scorring". To choose which photos go in the report, long-press a photo on
-   the **Photos** tab (the Report tab viewer is read-only); **Arrange** on the Report tab edits captions and order.
+   spell check, type a misspelling such as "scorring". To choose which photos go in the report, show a photo in the
+   viewer and tap **Add to report** (or **Remove from report**); the filmstrip check and "Report photos: n picked"
+   update at once. **Arrange** on the Report tab edits captions and order.
 8. **Submit report.** Tap **SUBMIT REPORT** (scroll the right pane if needed). The progress list runs; the spell
    check offers "Fix: scoring" → tap it → **Continue**. The report is built.
 9. **PDF preview.** "Page 1 of N": disposition letter, RMA report page (header, parts table, DIAGNOSIS, summary),
